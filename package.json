@@ -1,6 +1,6 @@
 {
   "name": "dsh-pi-login",
-  "description": "Pi-native multi-provider OAuth login for DeepSeek Harness. Independent store — never touches official CLI auth files.",
+  "description": "DSH-owned multi-provider OAuth login powered by Pi AI adapters. Independent store — never touches Pi Agent or official CLI auth files.",
   "version": "0.1.0",
   "publishConfig": {
     "access": "public",
@@ -9,6 +9,20 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/aa2246740/dsh-pi-login.git"
+  },
+  "homepage": "https://github.com/aa2246740/dsh-pi-login#readme",
+  "bugs": {
+    "url": "https://github.com/aa2246740/dsh-pi-login/issues"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "oauth",
+    "pi-agent",
+    "codex",
+    "openrouter"
+  ],
+  "engines": {
+    "node": ">=22.19.0"
   },
   "type": "module",
   "main": "lib/index.js",
@@ -43,9 +57,13 @@
     "INSTALL.zh.md",
     "README.md",
     "README.zh.md",
+    "SECURITY.md",
     "LICENSE"
   ],
   "license": "Apache-2.0",
+  "dependencies": {
+    "undici": "^8.5.0"
+  },
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

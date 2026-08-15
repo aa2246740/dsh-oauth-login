@@ -1,8 +1,9 @@
-/** Pi-native models.login() for every subscribed provider in the catalog. */
+/** DSH-owned models.login() for every subscribed provider in the catalog. */
 
 import { createModels } from '@earendil-works/pi-ai'
 import type { AuthInteraction } from '@earendil-works/pi-ai'
 import { requirePiLoginProvider } from './catalog.ts'
+import { configureOAuthHttpTransport } from './http.ts'
 import { catalogProvider } from './provider.ts'
 import type { PiLoginSession } from './session.ts'
 import { PiLoginCredentialStore } from './store.ts'
@@ -19,6 +20,7 @@ export async function loginPiProvider(
   store: PiLoginCredentialStore = new PiLoginCredentialStore(),
 ): Promise<void> {
   requirePiLoginProvider(providerId)
+  await configureOAuthHttpTransport()
   const models = createModels({ credentials: store })
   models.setProvider(catalogProvider(providerId))
   await models.login(providerId, 'oauth', interaction)
@@ -52,5 +54,8 @@ export async function loginPiProviderSession(
   interaction: AuthInteraction,
   session: PiLoginSession,
 ): Promise<void> {
-  await loginPiProvider(providerId, interaction, session.store)
+  requirePiLoginProvider(providerId)
+  await session.ensureTransport()
+  session.models.setProvider(catalogProvider(providerId))
+  await session.models.login(providerId, 'oauth', interaction)
 }

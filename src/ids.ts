@@ -1,5 +1,8 @@
-/** Basename of the multi-provider OAuth document inside the Harness home. */
-export const PI_LOGIN_AUTH_FILENAME = '.pi-login-auth.json'
+/** Basename of the DSH-owned multi-provider OAuth document. */
+export const PI_LOGIN_AUTH_FILENAME = '.dsh-oauth-auth.json'
+
+/** Legacy DSH filename accepted during the one-time storage migration. */
+export const LEGACY_PI_LOGIN_AUTH_FILENAME = '.pi-login-auth.json'
 
 /** Prefix for harness routes so they never collide with catalog / other plugins. */
 export const PI_LOGIN_ROUTE_PREFIX = 'pi-'

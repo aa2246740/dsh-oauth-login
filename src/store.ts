@@ -1,15 +1,16 @@
 /**
- * Multi-provider OAuth store. File is $DSH_HOME/.pi-login-auth.json.
+ * Multi-provider OAuth store. File is $DSH_HOME/.dsh-oauth-auth.json.
+ * The old .pi-login-auth.json name is read only as a DSH-owned migration source.
  * Never ~/.codex, ~/.grok, ~/.claude, or ~/.pi/agent/auth.json.
  */
 
 import { mkdir, readFile, rm, stat } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import type { Credential, CredentialInfo, CredentialStore, OAuthCredential } from '@earendil-works/pi-ai'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { PI_LOGIN_PROVIDERS } from './catalog.ts'
-import { PI_LOGIN_AUTH_FILENAME } from './ids.ts'
+import { LEGACY_PI_LOGIN_AUTH_FILENAME, PI_LOGIN_AUTH_FILENAME } from './ids.ts'
 
 const AUTH_FORMAT_VERSION = 1
 const ALLOWED_FIELDS = new Set([
@@ -107,21 +108,27 @@ export function piLoginAuthPath(dshHome?: string): string {
 
 export class PiLoginCredentialStore implements CredentialStore {
   readonly filename: string
+  readonly legacyFilename: string | undefined
 
   constructor(filename: string = piLoginAuthPath()) {
     this.filename = resolve(filename)
+    this.legacyFilename = basename(this.filename) === PI_LOGIN_AUTH_FILENAME
+      ? resolve(join(dirname(this.filename), LEGACY_PI_LOGIN_AUTH_FILENAME))
+      : undefined
   }
 
   private async readDocument(): Promise<AuthDocument> {
-    await assertOwnerOnly(this.filename)
-    let text: string
-    try {
-      text = await readFile(this.filename, 'utf8')
-    } catch (error) {
-      if (isENOENT(error)) return { version: AUTH_FORMAT_VERSION, credentials: {} }
-      throw error
+    const candidates = [this.filename, ...(this.legacyFilename === undefined ? [] : [this.legacyFilename])]
+    for (const filename of candidates) {
+      await assertOwnerOnly(filename)
+      try {
+        return parseDocument(await readFile(filename, 'utf8'), filename)
+      } catch (error) {
+        if (isENOENT(error)) continue
+        throw error
+      }
     }
-    return parseDocument(text, this.filename)
+    return { version: AUTH_FORMAT_VERSION, credentials: {} }
   }
 
   async read(providerId: string): Promise<Credential | undefined> {

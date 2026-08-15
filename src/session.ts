@@ -4,17 +4,31 @@ import { createModels } from '@earendil-works/pi-ai'
 import type { MutableModels } from '@earendil-works/pi-ai'
 import { PI_LOGIN_PROVIDERS } from './catalog.ts'
 import type { PiLoginProvider } from './catalog.ts'
+import { configureOAuthHttpTransport } from './http.ts'
+import type { OAuthProxyResolution } from './http.ts'
 import { allCatalogProviders, harnessProvider } from './provider.ts'
 import { PiLoginCredentialStore } from './store.ts'
 
 export class PiLoginSession {
   readonly store: PiLoginCredentialStore
   readonly models: MutableModels
+  private transportPromise?: Promise<OAuthProxyResolution>
 
   constructor(store: PiLoginCredentialStore = new PiLoginCredentialStore()) {
     this.store = store
     this.models = createModels({ credentials: store })
     for (const provider of allCatalogProviders()) this.models.setProvider(provider)
+  }
+
+  ensureTransport(): Promise<OAuthProxyResolution> {
+    if (this.transportPromise !== undefined) return this.transportPromise
+
+    const pending = configureOAuthHttpTransport()
+    this.transportPromise = pending
+    void pending.catch(() => {
+      if (this.transportPromise === pending) this.transportPromise = undefined
+    })
+    return pending
   }
 
   spec(id: string): PiLoginProvider {

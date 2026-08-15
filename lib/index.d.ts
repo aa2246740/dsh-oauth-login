@@ -24,10 +24,22 @@ declare const PI_LOGIN_PROVIDERS: readonly PiLoginProvider[];
 declare function piLoginProvider(id: string): PiLoginProvider | undefined;
 declare function piLoginRoutes(): string[];
 //#endregion
+//#region src/http.d.ts
+/** Proxy-aware HTTP transport for OAuth and subscribed-provider requests. */
+type OAuthProxyResolution = {
+  source: 'environment';
+} | {
+  source: 'explicit' | 'system' | 'loopback';
+  proxyUrl: string;
+} | {
+  source: 'direct';
+};
+//#endregion
 //#region src/store.d.ts
 declare function piLoginAuthPath(dshHome?: string): string;
 declare class PiLoginCredentialStore implements CredentialStore {
   readonly filename: string;
+  readonly legacyFilename: string | undefined;
   constructor(filename?: string);
   private readDocument;
   read(providerId: string): Promise<Credential | undefined>;
@@ -40,7 +52,9 @@ declare class PiLoginCredentialStore implements CredentialStore {
 declare class PiLoginSession {
   readonly store: PiLoginCredentialStore;
   readonly models: MutableModels;
+  private transportPromise?;
   constructor(store?: PiLoginCredentialStore);
+  ensureTransport(): Promise<OAuthProxyResolution>;
   spec(id: string): PiLoginProvider;
   provider(id: string): import("@earendil-works/pi-ai").Provider<import("@earendil-works/pi-ai").Api>;
   visibleModels(id: string): readonly import("@earendil-works/pi-ai").Model<import("@earendil-works/pi-ai").Api>[];
@@ -94,8 +108,10 @@ interface LoginChallenge {
 declare function registerPiLoginAuthRoutes(ctx: Context, session: PiLoginSession): void;
 //#endregion
 //#region src/ids.d.ts
-/** Basename of the multi-provider OAuth document inside the Harness home. */
-declare const PI_LOGIN_AUTH_FILENAME = ".pi-login-auth.json";
+/** Basename of the DSH-owned multi-provider OAuth document. */
+declare const PI_LOGIN_AUTH_FILENAME = ".dsh-oauth-auth.json";
+/** Legacy DSH filename accepted during the one-time storage migration. */
+declare const LEGACY_PI_LOGIN_AUTH_FILENAME = ".pi-login-auth.json";
 /** Prefix for harness routes so they never collide with catalog / other plugins. */
 declare const PI_LOGIN_ROUTE_PREFIX = "pi-";
 /** Provider idle ceiling used by every composite route. */
@@ -121,4 +137,4 @@ interface Config {}
 declare const Config: z<Config>;
 declare function apply(ctx: Context, _config: Config): void;
 //#endregion
-export { Config, type LoginChallenge, PI_LOGIN_AUTH_FILENAME, PI_LOGIN_AUTH_LOGIN_PATH, PI_LOGIN_AUTH_LOGOUT_PATH, PI_LOGIN_AUTH_STATUS_PATH, PI_LOGIN_PROVIDERS, PI_LOGIN_ROUTE_PREFIX, PI_LOGIN_STREAM_IDLE_TIMEOUT_MS, type PiLoginAuthStatus, PiLoginCredentialStore, type PiLoginProvider, type PiLoginProviderStatus, PiLoginSession, apply, catalogProvider, createPiLoginAdapter, harnessProvider, inject, isSafeAuthUrl, loginPiProvider, loginPiProviderSession, logoutPiProvider, name, piLoginAuthPath, piLoginProvider, piLoginRoutes, piLoginStatus, preferredModel, registerPiLoginAuthRoutes, safeMessage };
+export { Config, LEGACY_PI_LOGIN_AUTH_FILENAME, type LoginChallenge, PI_LOGIN_AUTH_FILENAME, PI_LOGIN_AUTH_LOGIN_PATH, PI_LOGIN_AUTH_LOGOUT_PATH, PI_LOGIN_AUTH_STATUS_PATH, PI_LOGIN_PROVIDERS, PI_LOGIN_ROUTE_PREFIX, PI_LOGIN_STREAM_IDLE_TIMEOUT_MS, type PiLoginAuthStatus, PiLoginCredentialStore, type PiLoginProvider, type PiLoginProviderStatus, PiLoginSession, apply, catalogProvider, createPiLoginAdapter, harnessProvider, inject, isSafeAuthUrl, loginPiProvider, loginPiProviderSession, logoutPiProvider, name, piLoginAuthPath, piLoginProvider, piLoginRoutes, piLoginStatus, preferredModel, registerPiLoginAuthRoutes, safeMessage };

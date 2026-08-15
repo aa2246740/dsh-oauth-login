@@ -1,6 +1,6 @@
 /**
- * Pi-native multi-provider OAuth for DeepSeek Harness.
- * Independent store. Never touches official CLI auth files.
+ * DSH-owned multi-provider OAuth for DeepSeek Harness.
+ * Independent store. Never touches Pi Agent or official CLI auth files.
  */
 
 import type { Context } from '@deepseek-ai/cordis'
@@ -31,7 +31,7 @@ export {
 export type { LoginChallenge, PiLoginProviderStatus } from './auth-routes.ts'
 export { PI_LOGIN_PROVIDERS, piLoginProvider, piLoginRoutes } from './catalog.ts'
 export type { PiLoginProvider } from './catalog.ts'
-export { PI_LOGIN_AUTH_FILENAME, PI_LOGIN_ROUTE_PREFIX, PI_LOGIN_STREAM_IDLE_TIMEOUT_MS } from './ids.ts'
+export { LEGACY_PI_LOGIN_AUTH_FILENAME, PI_LOGIN_AUTH_FILENAME, PI_LOGIN_ROUTE_PREFIX, PI_LOGIN_STREAM_IDLE_TIMEOUT_MS } from './ids.ts'
 export { catalogProvider, harnessProvider, preferredModel } from './provider.ts'
 export { isSafeAuthUrl, safeMessage } from './redact.ts'
 export { PiLoginSession } from './session.ts'

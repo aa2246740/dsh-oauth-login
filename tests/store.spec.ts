@@ -45,6 +45,22 @@ describe('PiLoginCredentialStore', () => {
     expect(openrouter?.type === 'oauth' && openrouter.refresh).toBe('')
   })
 
+  it('reads the legacy DSH filename and writes the new DSH filename', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'dsh-oauth-'))
+    const store = new PiLoginCredentialStore(join(dir, '.dsh-oauth-auth.json'))
+    await writeFile(join(dir, '.pi-login-auth.json'), `${JSON.stringify({
+      version: 1,
+      credentials: {
+        'openai-codex': { type: 'oauth', access: 'a', refresh: 'r', expires: 1 },
+      },
+    })}\n`, { mode: 0o600 })
+
+    const legacy = await store.read('openai-codex')
+    expect(legacy?.type === 'oauth' && legacy.access).toBe('a')
+    await store.modify('openai-codex', async current => current)
+    expect(JSON.parse(await readFile(store.filename, 'utf8')).credentials['openai-codex'].access).toBe('a')
+  })
+
   it('refuses unknown providers', async () => {
     const store = await tempStore()
     await expect(store.modify('not-a-provider', async current => current)).rejects.toThrow(/does not own/)

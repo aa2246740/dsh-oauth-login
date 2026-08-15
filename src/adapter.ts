@@ -28,6 +28,7 @@ export function createPiLoginAdapter(
       return profiles
     },
     resolveApiKey: async (route) => {
+      await session.ensureTransport()
       const spec = piLoginProviderByRoute(route)
       if (spec === undefined) {
         throw new LlmError(`dsh-pi-login: unknown route "${route}"`, 'MISSING_CREDENTIAL')
@@ -36,7 +37,7 @@ export function createPiLoginAdapter(
       const apiKey = auth?.auth.apiKey
       if (apiKey === undefined || apiKey.length === 0) {
         throw new LlmError(
-          `${spec.displayName} is not signed in. Open Settings → Pi Login and sign in.`,
+          `${spec.displayName} is not signed in. Open Settings → OAuth Login and sign in.`,
           'MISSING_CREDENTIAL',
         )
       }
