@@ -1,4 +1,4 @@
-# dsh-pi-login
+# dsh-oauth-login
 
 English | [中文](README.zh.md)
 
@@ -22,11 +22,11 @@ Radius is omitted: it needs a custom gateway.
 Clone the public repository, then install it as a `file:` package:
 
 ```sh
-git clone https://github.com/aa2246740/dsh-pi-login.git
-dsh plugin --profile web add file:./dsh-pi-login
+git clone https://github.com/aa2246740/dsh-oauth-login.git
+dsh plugin --profile web add file:./dsh-oauth-login
 ```
 
-Keep the `file:` prefix. A bare `./dsh-pi-login` is installed as a symlink;
+Keep the `file:` prefix. A bare `./dsh-oauth-login` is installed as a symlink;
 this plugin intentionally uses the Harness runtime as peer dependencies, so
 the copied `file:` install is required for Node to resolve those dependencies
 from the profile.
@@ -34,9 +34,9 @@ from the profile.
 Restart `dsh web`. **Settings → OAuth Login**. Existing DSH installs migrate the old `.pi-login-auth.json` filename on the next write; it is not Pi Agent’s auth file.
 
 ```sh
-dsh plugin --profile web exec dsh-pi-login login openai-codex
-dsh plugin --profile web exec dsh-pi-login login xai
-dsh plugin --profile web exec dsh-pi-login status
+dsh plugin --profile web exec dsh-oauth-login login openai-codex
+dsh plugin --profile web exec dsh-oauth-login login xai
+dsh plugin --profile web exec dsh-oauth-login status
 ```
 
 Pick a `pi-…` route in the composer.
