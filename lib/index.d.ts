@@ -81,9 +81,9 @@ declare function piLoginStatus(store?: PiLoginCredentialStore, providerId?: stri
 declare function loginPiProviderSession(providerId: string, interaction: AuthInteraction, session: PiLoginSession): Promise<void>;
 //#endregion
 //#region src/auth-routes.d.ts
-declare const PI_LOGIN_AUTH_STATUS_PATH = "/plugins/dsh-pi-login/auth/status";
-declare const PI_LOGIN_AUTH_LOGIN_PATH = "/plugins/dsh-pi-login/auth/login";
-declare const PI_LOGIN_AUTH_LOGOUT_PATH = "/plugins/dsh-pi-login/auth/logout";
+declare const PI_LOGIN_AUTH_STATUS_PATH = "/plugins/dsh-oauth-login/auth/status";
+declare const PI_LOGIN_AUTH_LOGIN_PATH = "/plugins/dsh-oauth-login/auth/login";
+declare const PI_LOGIN_AUTH_LOGOUT_PATH = "/plugins/dsh-oauth-login/auth/logout";
 type PiLoginAccountState = {
   status: 'signed-out';
 } | {
@@ -152,7 +152,7 @@ declare function safeMessage(error: unknown): string;
 declare function isSafeAuthUrl(raw: string, provider: PiLoginProvider): boolean;
 //#endregion
 //#region src/index.d.ts
-declare const name = "llm-pi-login";
+declare const name = "llm-oauth-login";
 declare const inject: string[];
 interface Config {}
 declare const Config: z<Config>;

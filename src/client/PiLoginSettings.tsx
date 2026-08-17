@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { PiLoginKey } from './locales.ts'
 
-const STATUS_PATH = '/plugins/dsh-pi-login/auth/status'
-const LOGIN_PATH = '/plugins/dsh-pi-login/auth/login'
-const LOGOUT_PATH = '/plugins/dsh-pi-login/auth/logout'
+const STATUS_PATH = '/plugins/dsh-oauth-login/auth/status'
+const LOGIN_PATH = '/plugins/dsh-oauth-login/auth/login'
+const LOGOUT_PATH = '/plugins/dsh-oauth-login/auth/logout'
 const POLL_INTERVAL_MS = 1_000
 const STYLE_ID = 'dsh-pi-login-settings-theme'
 

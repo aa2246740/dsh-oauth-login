@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
 
-const PACKAGE_NAME = 'dsh-pi-login'
+const PACKAGE_NAME = 'dsh-oauth-login'
 
 export const name = 'pi-login-invariant'
 export const inject = ['invariants']

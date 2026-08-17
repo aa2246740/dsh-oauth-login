@@ -15,12 +15,12 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-export const name = 'dsh-pi-login-client'
+export const name = 'dsh-oauth-login-client'
 export const inject = ['slots', 'locale']
 
 export function apply(ctx: ClientContext): void {
   const namespace = 'settings.pi-login'
-  ctx.effect(() => ctx.locale.register(namespace, { zh, en }), 'dsh-pi-login: settings copy')
+  ctx.effect(() => ctx.locale.register(namespace, { zh, en }), 'dsh-oauth-login: settings copy')
   const t = ctx.locale.bind(namespace) as PiLoginSettingsInjected['t']
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',

@@ -39,7 +39,7 @@ export { isSafeAuthUrl, safeMessage } from './redact.ts'
 export { PiLoginSession } from './session.ts'
 export { PiLoginCredentialStore, piLoginAuthPath } from './store.ts'
 
-export const name = 'llm-pi-login'
+export const name = 'llm-oauth-login'
 export const inject = ['llm']
 
 export interface Config {}

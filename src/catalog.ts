@@ -96,7 +96,7 @@ export function piLoginProviderByRoute(route: string): PiLoginProvider | undefin
 export function requirePiLoginProvider(id: string): PiLoginProvider {
   const provider = piLoginProvider(id)
   if (provider === undefined) {
-    throw new Error(`dsh-pi-login: unknown provider "${id}"`)
+    throw new Error(`dsh-oauth-login: unknown provider "${id}"`)
   }
   return provider
 }

@@ -80,7 +80,7 @@ async function answerPrompt(
 function printHelp(): void {
   const ids = PI_LOGIN_PROVIDERS.map(provider => `    ${provider.id.padEnd(18)} ${provider.displayName}`).join('\n')
   process.stdout.write([
-    'Usage: dsh-pi-login <login|logout|status> [provider]',
+    'Usage: dsh-oauth-login <login|logout|status> [provider]',
     '',
     '  login [provider]   Pi-native OAuth. Own file, not official CLIs',
     '  logout [provider]  remove a dsh credential (or all if omitted)',
@@ -104,11 +104,11 @@ export async function run(argv: readonly string[]): Promise<number> {
   }
   const [rawAction, rawProvider, ...rest] = argv
   if (rawAction !== 'login' && rawAction !== 'logout' && rawAction !== 'status') {
-    process.stderr.write(`dsh-pi-login: expected login, logout, or status; got ${JSON.stringify(rawAction)}\n`)
+    process.stderr.write(`dsh-oauth-login: expected login, logout, or status; got ${JSON.stringify(rawAction)}\n`)
     return 1
   }
   if (rest.length > 0) {
-    process.stderr.write(`dsh-pi-login: unexpected extra arguments: ${rest.join(' ')}\n`)
+    process.stderr.write(`dsh-oauth-login: unexpected extra arguments: ${rest.join(' ')}\n`)
     return 1
   }
   const action: Action = rawAction
@@ -149,7 +149,7 @@ export async function run(argv: readonly string[]): Promise<number> {
       }
       case 'login': {
         if (rawProvider === undefined) {
-          process.stderr.write('dsh-pi-login: login requires a provider id (see --help)\n')
+          process.stderr.write('dsh-oauth-login: login requires a provider id (see --help)\n')
           return 1
         }
         const id = requirePiLoginProvider(rawProvider).id
@@ -169,7 +169,7 @@ export async function run(argv: readonly string[]): Promise<number> {
       }
     }
   } catch (error: unknown) {
-    process.stderr.write(`dsh-pi-login: ${action} failed: ${safeMessage(error)}\n`)
+    process.stderr.write(`dsh-oauth-login: ${action} failed: ${safeMessage(error)}\n`)
     return 1
   }
 }
