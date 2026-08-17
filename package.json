@@ -1,5 +1,5 @@
 {
-  "name": "dsh-pi-login",
+  "name": "dsh-oauth-login",
   "description": "DSH-owned multi-provider OAuth login powered by Pi AI adapters. Independent store — never touches Pi Agent or official CLI auth files.",
   "version": "0.1.0",
   "publishConfig": {
@@ -8,11 +8,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/aa2246740/dsh-pi-login.git"
+    "url": "git+https://github.com/aa2246740/dsh-oauth-login.git"
   },
-  "homepage": "https://github.com/aa2246740/dsh-pi-login#readme",
+  "homepage": "https://github.com/aa2246740/dsh-oauth-login#readme",
   "bugs": {
-    "url": "https://github.com/aa2246740/dsh-pi-login/issues"
+    "url": "https://github.com/aa2246740/dsh-oauth-login/issues"
   },
   "keywords": [
     "deepseek-harness",
@@ -28,7 +28,7 @@
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "bin": {
-    "dsh-pi-login": "lib/bin.js"
+    "dsh-oauth-login": "lib/bin.js"
   },
   "scripts": {
     "build": "npm run typecheck && tsdown && node scripts/wrap-client.mjs",
