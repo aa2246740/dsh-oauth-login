@@ -1,4 +1,4 @@
-# dsh-pi-login
+# dsh-oauth-login
 
 [English](README.md) | 中文
 
@@ -22,18 +22,18 @@ Radius 没做：它要自己配网关。
 克隆公开仓库，再按 `file:` 方式安装：
 
 ```sh
-git clone https://github.com/aa2246740/dsh-pi-login.git
-dsh plugin --profile web add file:./dsh-pi-login
+git clone https://github.com/aa2246740/dsh-oauth-login.git
+dsh plugin --profile web add file:./dsh-oauth-login
 ```
 
-请保留 `file:` 前缀。直接写 `./dsh-pi-login` 会被安装成符号链接；本插件有意把 DSH 运行时作为 peer dependency，因此必须使用 `file:` 副本，Node 才能从 profile 解析这些依赖。
+请保留 `file:` 前缀。直接写 `./dsh-oauth-login` 会被安装成符号链接；本插件有意把 DSH 运行时作为 peer dependency，因此必须使用 `file:` 副本，Node 才能从 profile 解析这些依赖。
 
 重启 `dsh web`。**设置 → OAuth 登录**。旧版 DSH 的 `.pi-login-auth.json` 只作为 DSH 自己的迁移来源，不会当作 Pi Agent 文件处理。
 
 ```sh
-dsh plugin --profile web exec dsh-pi-login login openai-codex
-dsh plugin --profile web exec dsh-pi-login login xai
-dsh plugin --profile web exec dsh-pi-login status
+dsh plugin --profile web exec dsh-oauth-login login openai-codex
+dsh plugin --profile web exec dsh-oauth-login login xai
+dsh plugin --profile web exec dsh-oauth-login status
 ```
 
 对话里选 `pi-…` 路由。
