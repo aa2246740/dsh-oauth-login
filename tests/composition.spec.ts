@@ -6,10 +6,10 @@ import { describe, expect, it } from 'vitest'
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 describe('bundle composition', () => {
-  it('inserts llm-pi-login without forcing a default model', async () => {
+  it('inserts llm-oauth-login without forcing a default model', async () => {
     const patch = await readFile(join(root, 'cordis.patch.yml'), 'utf8')
-    expect(patch).toContain('id: llm-pi-login')
-    expect(patch).toContain('name: dsh-pi-login')
+    expect(patch).toContain('id: llm-oauth-login')
+    expect(patch).toContain('name: dsh-oauth-login')
     expect(patch).not.toContain('agent-default-model')
   })
 
@@ -18,7 +18,7 @@ describe('bundle composition', () => {
       name: string
       dsh: { bundle: { patch: string }; client: { platform: string } }
     }
-    expect(manifest.name).toBe('dsh-pi-login')
+    expect(manifest.name).toBe('dsh-oauth-login')
     expect(manifest.dsh.bundle.patch).toBe('./cordis.patch.yml')
     expect(manifest.dsh.client.platform).toBe('web')
   })

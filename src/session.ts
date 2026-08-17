@@ -33,7 +33,7 @@ export class PiLoginSession {
 
   spec(id: string): PiLoginProvider {
     const spec = piLoginProvider(id)
-    if (spec === undefined) throw new Error(`dsh-pi-login: unknown provider "${id}"`)
+    if (spec === undefined) throw new Error(`dsh-oauth-login: unknown provider "${id}"`)
     return spec
   }
 

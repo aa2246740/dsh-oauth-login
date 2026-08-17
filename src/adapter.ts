@@ -20,7 +20,7 @@ export function createPiLoginAdapter(
           provider: spec.route,
           displayName: spec.displayName,
           streamIdleTimeoutMs: PI_LOGIN_STREAM_IDLE_TIMEOUT_MS,
-          retryPolicy: resolveRetryPolicy(undefined, 'dsh-pi-login retryPolicy'),
+          retryPolicy: resolveRetryPolicy(undefined, 'dsh-oauth-login retryPolicy'),
           configuredMaxTokens: new Map(),
           piProvider: session.provider(spec.id),
         })
@@ -31,7 +31,7 @@ export function createPiLoginAdapter(
       await session.ensureTransport()
       const spec = piLoginProviderByRoute(route)
       if (spec === undefined) {
-        throw new LlmError(`dsh-pi-login: unknown route "${route}"`, 'MISSING_CREDENTIAL')
+        throw new LlmError(`dsh-oauth-login: unknown route "${route}"`, 'MISSING_CREDENTIAL')
       }
       const auth = await session.models.getAuth(spec.id)
       const apiKey = auth?.auth.apiKey

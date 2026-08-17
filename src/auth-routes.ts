@@ -10,9 +10,9 @@ import type { PiLoginProvider } from './catalog.ts'
 import { isSafeAuthUrl, safeMessage } from './redact.ts'
 import type { PiLoginSession } from './session.ts'
 
-export const PI_LOGIN_AUTH_STATUS_PATH = '/plugins/dsh-pi-login/auth/status'
-export const PI_LOGIN_AUTH_LOGIN_PATH = '/plugins/dsh-pi-login/auth/login'
-export const PI_LOGIN_AUTH_LOGOUT_PATH = '/plugins/dsh-pi-login/auth/logout'
+export const PI_LOGIN_AUTH_STATUS_PATH = '/plugins/dsh-oauth-login/auth/status'
+export const PI_LOGIN_AUTH_LOGIN_PATH = '/plugins/dsh-oauth-login/auth/login'
+export const PI_LOGIN_AUTH_LOGOUT_PATH = '/plugins/dsh-oauth-login/auth/logout'
 
 export type PiLoginAccountState =
   | { status: 'signed-out' }
@@ -178,7 +178,7 @@ export class PiLoginWebAuth {
 
   private slot(id: string): ProviderAuth {
     const slot = this.byId.get(id)
-    if (slot === undefined) throw new Error(`dsh-pi-login: unknown provider "${id}"`)
+    if (slot === undefined) throw new Error(`dsh-oauth-login: unknown provider "${id}"`)
     return slot
   }
 
@@ -323,5 +323,5 @@ export function registerPiLoginAuthRoutes(
       for (const dispose of routes) dispose()
       await auth.dispose()
     }
-  }, 'dsh-pi-login: Web OAuth routes')
+  }, 'dsh-oauth-login: Web OAuth routes')
 }

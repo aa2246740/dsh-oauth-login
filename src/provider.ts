@@ -19,7 +19,7 @@ function harnessApiKeyAuth(name: string): ApiKeyAuth {
 export function catalogProvider(id: string): Provider {
   const base = builtinProviders().find(candidate => candidate.id === id)
   if (base === undefined) {
-    throw new Error(`dsh-pi-login: the installed pi-ai catalog ships no "${id}" provider`)
+    throw new Error(`dsh-oauth-login: the installed pi-ai catalog ships no "${id}" provider`)
   }
   return base
 }

@@ -39,13 +39,13 @@ export interface OAuthProxyDiscoveryOptions {
 
 function normalizeProxyUrl(value: string): string {
   const trimmed = value.trim()
-  if (trimmed.length === 0) throw new Error('dsh-pi-login: proxy URL is empty')
+  if (trimmed.length === 0) throw new Error('dsh-oauth-login: proxy URL is empty')
 
   const url = new URL(trimmed.includes('://') ? trimmed : `http://${trimmed}`)
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new Error(`dsh-pi-login: unsupported proxy protocol "${url.protocol}"`)
+    throw new Error(`dsh-oauth-login: unsupported proxy protocol "${url.protocol}"`)
   }
-  if (url.hostname.length === 0) throw new Error('dsh-pi-login: proxy URL has no host')
+  if (url.hostname.length === 0) throw new Error('dsh-oauth-login: proxy URL has no host')
 
   url.pathname = '/'
   url.search = ''
