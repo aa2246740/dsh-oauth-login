@@ -2,7 +2,7 @@
 
 import { createModels } from '@earendil-works/pi-ai'
 import type { MutableModels } from '@earendil-works/pi-ai'
-import { PI_LOGIN_PROVIDERS } from './catalog.ts'
+import { PI_LOGIN_PROVIDERS, piLoginProvider } from './catalog.ts'
 import type { PiLoginProvider } from './catalog.ts'
 import { configureOAuthHttpTransport } from './http.ts'
 import type { OAuthProxyResolution } from './http.ts'
@@ -32,7 +32,7 @@ export class PiLoginSession {
   }
 
   spec(id: string): PiLoginProvider {
-    const spec = PI_LOGIN_PROVIDERS.find(provider => provider.id === id)
+    const spec = piLoginProvider(id)
     if (spec === undefined) throw new Error(`dsh-pi-login: unknown provider "${id}"`)
     return spec
   }
@@ -43,6 +43,17 @@ export class PiLoginSession {
 
   visibleModels(id: string) {
     return this.provider(id).getModels()
+  }
+
+  /**
+   * Harness routes that currently hold a stored OAuth grant.
+   * Model pickers should only advertise these — logging out must drop the route.
+   */
+  async authenticatedRoutes(): Promise<string[]> {
+    const signedIn = new Set((await this.store.list()).map(item => item.providerId))
+    return PI_LOGIN_PROVIDERS
+      .filter(provider => signedIn.has(provider.id))
+      .map(provider => provider.route)
   }
 
   async logout(id: string): Promise<void> {

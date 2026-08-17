@@ -87,6 +87,11 @@ class ProviderAuth {
     this.challenge = undefined
   }
 
+  /** Wait until an in-flight sign-in settles (success or error). No-op if idle. */
+  async waitUntilSettled(): Promise<void> {
+    await this.operation?.catch(() => undefined)
+  }
+
   async dispose(): Promise<void> {
     this.cancellation?.abort(new Error('Pi login plugin disposed'))
     await this.operation?.catch(() => undefined)
@@ -201,6 +206,12 @@ export class PiLoginWebAuth {
     await this.slot(id).signOut()
   }
 
+  /** Wait until the named provider's in-flight sign-in settles. */
+  async waitUntilSettled(id: string): Promise<void> {
+    requirePiLoginProvider(id)
+    await this.slot(id).waitUntilSettled()
+  }
+
   async dispose(): Promise<void> {
     await Promise.all([...this.byId.values()].map(slot => slot.dispose()))
   }
@@ -249,8 +260,20 @@ function providerIdFrom(value: unknown): string {
   return requirePiLoginProvider(value.provider).id
 }
 
-export function registerPiLoginAuthRoutes(ctx: Context, session: PiLoginSession): void {
+export interface PiLoginAuthRouteOptions {
+  /** Called after a successful sign-in or sign-out so the host can refresh LLM routes. */
+  onAuthChanged?: () => void | Promise<void>
+}
+
+export function registerPiLoginAuthRoutes(
+  ctx: Context,
+  session: PiLoginSession,
+  options: PiLoginAuthRouteOptions = {},
+): void {
   const auth = new PiLoginWebAuth(session)
+  const notifyAuthChanged = async (): Promise<void> => {
+    await options.onAuthChanged?.()
+  }
   ctx.effect(() => {
     const routes = [
       ctx.webServer.register({
@@ -269,7 +292,12 @@ export function registerPiLoginAuthRoutes(ctx: Context, session: PiLoginSession)
           if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
           if (!trustedRequest(req)) return json(res, 403, { error: 'forbidden' })
           try {
-            json(res, 200, await auth.signIn(providerIdFrom(await readJson(req))))
+            const challenge = await auth.signIn(providerIdFrom(await readJson(req)))
+            // Login finishes in the browser; refresh LLM routes once the grant lands.
+            void auth.waitUntilSettled(challenge.provider).then(async () => {
+              await notifyAuthChanged()
+            })
+            json(res, 200, challenge)
           } catch (error: unknown) {
             json(res, 500, { error: safeMessage(error) })
           }
@@ -283,6 +311,7 @@ export function registerPiLoginAuthRoutes(ctx: Context, session: PiLoginSession)
           if (!trustedRequest(req)) return json(res, 403, { error: 'forbidden' })
           try {
             await auth.signOut(providerIdFrom(await readJson(req)))
+            await notifyAuthChanged()
             json(res, 200, { ok: true })
           } catch (error: unknown) {
             json(res, 500, { error: safeMessage(error) })

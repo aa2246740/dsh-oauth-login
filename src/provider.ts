@@ -4,6 +4,7 @@ import { builtinProviders } from '@earendil-works/pi-ai/providers/all'
 import type { Api, ApiKeyAuth, Model, Provider } from '@earendil-works/pi-ai'
 import { PI_LOGIN_PROVIDERS } from './catalog.ts'
 import type { PiLoginProvider } from './catalog.ts'
+import { extraModelsFor } from './extra-models.ts'
 
 function harnessApiKeyAuth(name: string): ApiKeyAuth {
   return {
@@ -23,7 +24,28 @@ export function catalogProvider(id: string): Provider {
   return base
 }
 
-export function preferredModel(spec: PiLoginProvider, models: readonly { id: string }[] = catalogProvider(spec.id).getModels()): string {
+/**
+ * Catalog models plus plugin-owned extras, remapped onto the harness route.
+ * Extras fill gaps the installed pi-ai version has not shipped yet (e.g. grok-4.6).
+ */
+export function harnessModels(spec: PiLoginProvider): Model<Api>[] {
+  const base = catalogProvider(spec.id).getModels()
+  const seen = new Set(base.map(model => model.id))
+  const merged: Model<Api>[] = [...base]
+  for (const extra of extraModelsFor(spec.id)) {
+    if (seen.has(extra.id)) continue
+    seen.add(extra.id)
+    merged.push(extra)
+  }
+  return merged.map(model => (
+    model.provider === spec.route ? model : { ...model, provider: spec.route }
+  ))
+}
+
+export function preferredModel(
+  spec: PiLoginProvider,
+  models: readonly { id: string }[] = harnessModels(spec),
+): string {
   const ids = new Set(models.map(model => model.id))
   for (const candidate of spec.preferredModels) {
     if (ids.has(candidate)) return candidate
@@ -33,15 +55,12 @@ export function preferredModel(spec: PiLoginProvider, models: readonly { id: str
 
 export function harnessProvider(spec: PiLoginProvider): Provider {
   const base = catalogProvider(spec.id)
-  const models = (): Model<Api>[] => base.getModels().map(model => (
-    model.provider === spec.route ? model : { ...model, provider: spec.route }
-  ))
   return {
     id: spec.route,
     name: spec.displayName,
     ...base.baseUrl === undefined ? {} : { baseUrl: base.baseUrl },
     auth: { ...base.auth, apiKey: harnessApiKeyAuth(spec.displayName) },
-    getModels: models,
+    getModels: () => harnessModels(spec),
     stream: (model, context, options) => base.stream(model, context, options),
     streamSimple: (model, context, options) => base.streamSimple(model, context, options),
   }

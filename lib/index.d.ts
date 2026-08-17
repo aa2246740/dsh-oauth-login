@@ -1,6 +1,6 @@
 import z from "@deepseek-ai/schemastery";
 import { PiAiAdapter } from "@deepseek-ai/dsh-llm-pi-ai";
-import { AuthInteraction, Credential, CredentialInfo, CredentialStore, MutableModels, Provider } from "@earendil-works/pi-ai";
+import { Api, AuthInteraction, Credential, CredentialInfo, CredentialStore, Model, MutableModels, Provider } from "@earendil-works/pi-ai";
 import { Context } from "@deepseek-ai/cordis";
 import { AttachmentStore } from "@deepseek-ai/dsh-attachment";
 //#region src/catalog.d.ts
@@ -58,6 +58,11 @@ declare class PiLoginSession {
   spec(id: string): PiLoginProvider;
   provider(id: string): import("@earendil-works/pi-ai").Provider<import("@earendil-works/pi-ai").Api>;
   visibleModels(id: string): readonly import("@earendil-works/pi-ai").Model<import("@earendil-works/pi-ai").Api>[];
+  /**
+   * Harness routes that currently hold a stored OAuth grant.
+   * Model pickers should only advertise these — logging out must drop the route.
+   */
+  authenticatedRoutes(): Promise<string[]>;
   logout(id: string): Promise<void>;
 }
 //#endregion
@@ -105,7 +110,18 @@ interface LoginChallenge {
   url: string;
   userCode?: string;
 }
-declare function registerPiLoginAuthRoutes(ctx: Context, session: PiLoginSession): void;
+interface PiLoginAuthRouteOptions {
+  /** Called after a successful sign-in or sign-out so the host can refresh LLM routes. */
+  onAuthChanged?: () => void | Promise<void>;
+}
+declare function registerPiLoginAuthRoutes(ctx: Context, session: PiLoginSession, options?: PiLoginAuthRouteOptions): void;
+//#endregion
+//#region src/extra-models.d.ts
+/**
+ * Extra models this plugin publishes for one pi-ai provider id.
+ * @param providerId - catalog provider id (e.g. `xai`), not the harness route.
+ */
+declare function extraModelsFor(providerId: string): readonly Model<Api>[];
 //#endregion
 //#region src/ids.d.ts
 /** Basename of the DSH-owned multi-provider OAuth document. */
@@ -119,6 +135,11 @@ declare const PI_LOGIN_STREAM_IDLE_TIMEOUT_MS = 300000;
 //#endregion
 //#region src/provider.d.ts
 declare function catalogProvider(id: string): Provider;
+/**
+ * Catalog models plus plugin-owned extras, remapped onto the harness route.
+ * Extras fill gaps the installed pi-ai version has not shipped yet (e.g. grok-4.6).
+ */
+declare function harnessModels(spec: PiLoginProvider): Model<Api>[];
 declare function preferredModel(spec: PiLoginProvider, models?: readonly {
   id: string;
 }[]): string;
@@ -137,4 +158,4 @@ interface Config {}
 declare const Config: z<Config>;
 declare function apply(ctx: Context, _config: Config): void;
 //#endregion
-export { Config, LEGACY_PI_LOGIN_AUTH_FILENAME, type LoginChallenge, PI_LOGIN_AUTH_FILENAME, PI_LOGIN_AUTH_LOGIN_PATH, PI_LOGIN_AUTH_LOGOUT_PATH, PI_LOGIN_AUTH_STATUS_PATH, PI_LOGIN_PROVIDERS, PI_LOGIN_ROUTE_PREFIX, PI_LOGIN_STREAM_IDLE_TIMEOUT_MS, type PiLoginAuthStatus, PiLoginCredentialStore, type PiLoginProvider, type PiLoginProviderStatus, PiLoginSession, apply, catalogProvider, createPiLoginAdapter, harnessProvider, inject, isSafeAuthUrl, loginPiProvider, loginPiProviderSession, logoutPiProvider, name, piLoginAuthPath, piLoginProvider, piLoginRoutes, piLoginStatus, preferredModel, registerPiLoginAuthRoutes, safeMessage };
+export { Config, LEGACY_PI_LOGIN_AUTH_FILENAME, type LoginChallenge, PI_LOGIN_AUTH_FILENAME, PI_LOGIN_AUTH_LOGIN_PATH, PI_LOGIN_AUTH_LOGOUT_PATH, PI_LOGIN_AUTH_STATUS_PATH, PI_LOGIN_PROVIDERS, PI_LOGIN_ROUTE_PREFIX, PI_LOGIN_STREAM_IDLE_TIMEOUT_MS, type PiLoginAuthStatus, PiLoginCredentialStore, type PiLoginProvider, type PiLoginProviderStatus, PiLoginSession, apply, catalogProvider, createPiLoginAdapter, extraModelsFor, harnessModels, harnessProvider, inject, isSafeAuthUrl, loginPiProvider, loginPiProviderSession, logoutPiProvider, name, piLoginAuthPath, piLoginProvider, piLoginRoutes, piLoginStatus, preferredModel, registerPiLoginAuthRoutes, safeMessage };

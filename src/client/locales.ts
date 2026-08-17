@@ -17,7 +17,7 @@ export const en = {
   isolation: 'Each provider is a separate OAuth grant. Pi Agent and official CLIs keep their own files; this plugin will not steal their refresh tokens.',
   expires: 'Access token expires',
   models: 'Catalog models',
-  modelHint: 'Pick the `pi-…` route in the composer. Lists come from the installed pi-ai catalog.',
+  modelHint: 'Pick the `pi-…` route in the composer. Only signed-in providers appear in the model list.',
   route: 'Route',
 } as const
 
@@ -42,6 +42,6 @@ export const zh: { [Key in PiLoginKey]: string } = {
   isolation: '每个厂商都是独立授权。Pi Agent 和官方 CLI 继续用自己的文件，这个插件不会去抢它们的 refresh token。',
   expires: 'Access token 到期',
   models: '目录模型',
-  modelHint: '对话里选 `pi-…` 路由。列表来自已安装的 pi-ai 目录。',
+  modelHint: '对话里选 `pi-…` 路由。只有已登录的提供方会出现在模型列表里。',
   route: '路由',
 }
