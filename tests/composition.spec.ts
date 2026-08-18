@@ -13,6 +13,21 @@ describe('bundle composition', () => {
     expect(patch).not.toContain('agent-default-model')
   })
 
+  it('keeps a portable dshx workshop overlay and boot marker', async () => {
+    const [manifest, overlay, entry] = await Promise.all([
+      readFile(join(root, 'dshx.yml'), 'utf8'),
+      readFile(join(root, 'cordis.yml'), 'utf8'),
+      readFile(join(root, 'src/index.ts'), 'utf8'),
+    ])
+    expect(manifest).toContain('id: llm-oauth-login')
+    expect(manifest).toContain('marker: "[my-plugins/dsh-oauth-login] loaded"')
+    expect(overlay).toContain('id: llm-oauth-login')
+    expect(overlay).toContain("name: './src/index.ts'")
+    expect(overlay).not.toMatch(/\/workspace\/|\/home\//)
+    expect(entry).toContain('[my-plugins/dsh-oauth-login] loaded')
+    expect(entry).not.toMatch(/export\s+default\s+/)
+  })
+
   it('declares a dsh bundle and web client half', async () => {
     const manifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8')) as {
       name: string

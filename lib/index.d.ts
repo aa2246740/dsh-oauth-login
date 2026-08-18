@@ -1,8 +1,21 @@
-import z from "@deepseek-ai/schemastery";
+import { LlmFailure, RetryPolicyConfig } from "@deepseek-ai/dsh-llm";
 import { PiAiAdapter } from "@deepseek-ai/dsh-llm-pi-ai";
 import { Api, AuthInteraction, Credential, CredentialInfo, CredentialStore, Model, MutableModels, Provider } from "@earendil-works/pi-ai";
+import z from "@deepseek-ai/schemastery";
 import { Context } from "@deepseek-ai/cordis";
 import { AttachmentStore } from "@deepseek-ai/dsh-attachment";
+//#region src/plugin-config.d.ts
+/**
+ * `retryPolicy` is executed by shipped `dsh-llm-retry`, not by this plugin.
+ * Omission keeps the official normal default (2 retries for TIMEOUT /
+ * TRANSPORT / SERVER / RATE_LIMIT / EMPTY_RESPONSE).
+ */
+interface Config {
+  streamIdleTimeoutMs?: number;
+  retryPolicy?: RetryPolicyConfig;
+}
+declare const Config: z<Config>;
+//#endregion
 //#region src/catalog.d.ts
 /** OAuth subscriptions Pi Agent exposes via /login. Radius is omitted (needs a gateway). */
 interface PiLoginProvider {
@@ -67,7 +80,11 @@ declare class PiLoginSession {
 }
 //#endregion
 //#region src/adapter.d.ts
-declare function createPiLoginAdapter(session: PiLoginSession, resolveAttachments: () => AttachmentStore | undefined): PiAiAdapter;
+interface PiLoginAdapterOptions {
+  streamIdleTimeoutMs?: number;
+  retryPolicy?: RetryPolicyConfig;
+}
+declare function createPiLoginAdapter(session: PiLoginSession, resolveAttachments: () => AttachmentStore | undefined, options?: PiLoginAdapterOptions): PiAiAdapter;
 //#endregion
 //#region src/auth.d.ts
 interface PiLoginAuthStatus {
@@ -132,6 +149,23 @@ declare const LEGACY_PI_LOGIN_AUTH_FILENAME = ".pi-login-auth.json";
 declare const PI_LOGIN_ROUTE_PREFIX = "pi-";
 /** Provider idle ceiling used by every composite route. */
 declare const PI_LOGIN_STREAM_IDLE_TIMEOUT_MS = 300000;
+/** Startup line `dshx verify` looks for. */
+declare const PI_LOGIN_BOOT_MARKER = "[my-plugins/dsh-oauth-login] loaded";
+//#endregion
+//#region src/model-error-hint.d.ts
+/**
+ * Default Harness `retryPolicy` codes. Keep aligned with
+ * `resolveRetryPolicy(undefined)` in `@deepseek-ai/dsh-llm`.
+ */
+declare const TRANSIENT_MODEL_CODES: readonly string[];
+declare const QUOTA_HINT = "This is account quota or credits, not a temporary busy signal. Automatic retry will not refill it. Check the plan, usage window, or balance.";
+declare const RATE_LIMIT_HINT = "This is a request-rate or peak-busy limit. A 429 is often this, not an empty balance. After automatic retries end, wait and send another message. If Continue fails or the composer stays stuck, start a new chat.";
+declare const TRANSIENT_HINT = "After this turn ends, send another message to try again. If Continue fails or the composer stays stuck, start a new chat.";
+/** Stable Chat copy for one official `LlmError` code. Does not invent 5h vs weekly vs billing. */
+declare function hintForCode(code: string): string | undefined;
+declare function hintFailure(failure: LlmFailure): LlmFailure;
+/** Append a code-specific hint without changing the routable `code`. */
+declare function withModelErrorHint(error: unknown): unknown;
 //#endregion
 //#region src/provider.d.ts
 declare function catalogProvider(id: string): Provider;
@@ -154,8 +188,6 @@ declare function isSafeAuthUrl(raw: string, provider: PiLoginProvider): boolean;
 //#region src/index.d.ts
 declare const name = "llm-oauth-login";
 declare const inject: string[];
-interface Config {}
-declare const Config: z<Config>;
-declare function apply(ctx: Context, _config: Config): void;
+declare function apply(ctx: Context, config: Config): void;
 //#endregion
-export { Config, LEGACY_PI_LOGIN_AUTH_FILENAME, type LoginChallenge, PI_LOGIN_AUTH_FILENAME, PI_LOGIN_AUTH_LOGIN_PATH, PI_LOGIN_AUTH_LOGOUT_PATH, PI_LOGIN_AUTH_STATUS_PATH, PI_LOGIN_PROVIDERS, PI_LOGIN_ROUTE_PREFIX, PI_LOGIN_STREAM_IDLE_TIMEOUT_MS, type PiLoginAuthStatus, PiLoginCredentialStore, type PiLoginProvider, type PiLoginProviderStatus, PiLoginSession, apply, catalogProvider, createPiLoginAdapter, extraModelsFor, harnessModels, harnessProvider, inject, isSafeAuthUrl, loginPiProvider, loginPiProviderSession, logoutPiProvider, name, piLoginAuthPath, piLoginProvider, piLoginRoutes, piLoginStatus, preferredModel, registerPiLoginAuthRoutes, safeMessage };
+export { Config, type Config as PluginConfig, LEGACY_PI_LOGIN_AUTH_FILENAME, type LoginChallenge, PI_LOGIN_AUTH_FILENAME, PI_LOGIN_AUTH_LOGIN_PATH, PI_LOGIN_AUTH_LOGOUT_PATH, PI_LOGIN_AUTH_STATUS_PATH, PI_LOGIN_BOOT_MARKER, PI_LOGIN_PROVIDERS, PI_LOGIN_ROUTE_PREFIX, PI_LOGIN_STREAM_IDLE_TIMEOUT_MS, type PiLoginAdapterOptions, type PiLoginAuthStatus, PiLoginCredentialStore, type PiLoginProvider, type PiLoginProviderStatus, PiLoginSession, QUOTA_HINT, RATE_LIMIT_HINT, TRANSIENT_HINT, TRANSIENT_MODEL_CODES, apply, catalogProvider, createPiLoginAdapter, extraModelsFor, harnessModels, harnessProvider, hintFailure, hintForCode, inject, isSafeAuthUrl, loginPiProvider, loginPiProviderSession, logoutPiProvider, name, piLoginAuthPath, piLoginProvider, piLoginRoutes, piLoginStatus, preferredModel, registerPiLoginAuthRoutes, safeMessage, withModelErrorHint };
