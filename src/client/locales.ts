@@ -12,7 +12,6 @@ export const en = {
   userCode: 'Code',
   openUrl: 'Authorize',
   requestFailed: 'The login request failed.',
-  expires: 'Expires',
 } as const
 
 export type PiLoginKey = keyof typeof en
@@ -31,5 +30,4 @@ export const zh: { [Key in PiLoginKey]: string } = {
   userCode: '授权码',
   openUrl: '授权',
   requestFailed: '登录请求失败。',
-  expires: '到期',
 }

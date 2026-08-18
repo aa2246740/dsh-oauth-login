@@ -57,7 +57,6 @@ const SETTINGS_CSS = `
 .dsh-pi-login-dot.is-signed-in { background:var(--dsw-alias-state-success-primary, #22a06b); }
 .dsh-pi-login-dot.is-error { background:var(--dsw-alias-state-error-primary, #d92d20); }
 .dsh-pi-login-dot.is-signing-in { background:var(--dsw-alias-brand-primary, #1677ff); }
-.dsh-pi-login-sep { color:var(--dsw-alias-label-dimmed, #9aa0a6); }
 .dsh-pi-login-btn {
   box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center;
   min-height:32px; padding:4px 14px; border-radius:16px; font:inherit; font-size:13px; line-height:20px; cursor:pointer;
@@ -193,9 +192,6 @@ export function PiLoginSettings({ t }: PiLoginSettingsProps) {
                     : account.status === 'signing-in'
                       ? 'dsh-pi-login-dot is-signing-in'
                       : 'dsh-pi-login-dot'
-                const expires = account.status === 'signed-in' && account.expiresAt !== undefined
-                  ? new Date(account.expiresAt).toLocaleString()
-                  : undefined
                 return (
                   <article key={provider.id} className="dsh-pi-login-card">
                     <div className="dsh-pi-login-row">
@@ -225,14 +221,6 @@ export function PiLoginSettings({ t }: PiLoginSettingsProps) {
                     <div className="dsh-pi-login-status" role="status">
                       <span aria-hidden="true" className={dotClass} />
                       <span>{label}</span>
-                      {expires !== undefined
-                        ? (
-                            <>
-                              <span className="dsh-pi-login-sep" aria-hidden="true">·</span>
-                              <span>{t('expires')} {expires}</span>
-                            </>
-                          )
-                        : null}
                     </div>
                     {account.status === 'error' ? <p className="dsh-pi-login-error">{account.message}</p> : null}
                     {account.status === 'signing-in' && account.userCode !== undefined
