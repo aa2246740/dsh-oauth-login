@@ -9,3 +9,6 @@ export const PI_LOGIN_ROUTE_PREFIX = 'pi-'
 
 /** Provider idle ceiling used by every composite route. */
 export const PI_LOGIN_STREAM_IDLE_TIMEOUT_MS = 300_000
+
+/** Startup line `dshx verify` looks for. */
+export const PI_LOGIN_BOOT_MARKER = '[my-plugins/dsh-oauth-login] loaded'

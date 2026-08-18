@@ -271,6 +271,7 @@ export function PiLoginSettings({ t }: PiLoginSettingsProps) {
           )}
       <p className="dsh-pi-login-body">{t('isolation')}</p>
       <p className="dsh-pi-login-body">{t('modelHint')}</p>
+      <p className="dsh-pi-login-body">{t('errorHint')}</p>
     </section>
   )
 }
