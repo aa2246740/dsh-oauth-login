@@ -10,6 +10,7 @@ import type { AdapterRegistrationHandle } from '@deepseek-ai/dsh-llm'
 import { createPiLoginAdapter } from './adapter.ts'
 import { registerPiLoginAuthRoutes } from './auth-routes.ts'
 import { piLoginRoutes } from './catalog.ts'
+import { OAUTH_REFRESH_POLL_MS } from './oauth-refresh.ts'
 import type { Config } from './plugin-config.ts'
 import { PiLoginSession } from './session.ts'
 import { PiLoginCredentialStore } from './store.ts'
@@ -33,6 +34,11 @@ export type { LoginChallenge, PiLoginProviderStatus } from './auth-routes.ts'
 export { PI_LOGIN_PROVIDERS, piLoginProvider, piLoginRoutes } from './catalog.ts'
 export type { PiLoginProvider } from './catalog.ts'
 export { extraModelsFor } from './extra-models.ts'
+export {
+  grantNeedsRefresh,
+  OAUTH_REFRESH_POLL_MS,
+  OAUTH_REFRESH_SOON_MS,
+} from './oauth-refresh.ts'
 export { Config } from './plugin-config.ts'
 export type { Config as PluginConfig } from './plugin-config.ts'
 export {
@@ -83,6 +89,13 @@ export function apply(ctx: Context, config: Config): void {
   )
   const refreshRoutes = (): Promise<void> => syncAuthenticatedRoutes(session, registration)
   void refreshRoutes()
+  ctx.effect(() => {
+    const timer = setInterval(() => {
+      void session.refreshStoredGrants()
+    }, OAUTH_REFRESH_POLL_MS)
+    void session.refreshStoredGrants()
+    return () => clearInterval(timer)
+  }, 'dsh-oauth-login: refresh oauth grants')
   ctx.inject(['webServer'], webCtx => {
     registerPiLoginAuthRoutes(webCtx, session, { onAuthChanged: refreshRoutes })
   })

@@ -77,6 +77,11 @@ declare class PiLoginSession {
    */
   authenticatedRoutes(): Promise<string[]>;
   logout(id: string): Promise<void>;
+  /**
+   * Renew access tokens that are expired or close to expiry.
+   * Failures stay in the store; the next poll or chat retries.
+   */
+  refreshStoredGrants(now?: number): Promise<void>;
 }
 //#endregion
 //#region src/adapter.d.ts
@@ -140,6 +145,18 @@ declare function registerPiLoginAuthRoutes(ctx: Context, session: PiLoginSession
  */
 declare function extraModelsFor(providerId: string): readonly Model<Api>[];
 //#endregion
+//#region src/oauth-refresh.d.ts
+/**
+ * When to spend a refresh_token. Chat already refreshes via Models.getAuth;
+ * this helper is for status / boot / the host timer so the store does not sit
+ * on a stale expires stamp.
+ */
+/** Refresh when the stored access stamp is inside this window (Pi already skews expires by 5 min). */
+declare const OAUTH_REFRESH_SOON_MS: number;
+/** Host timer. Access lives ~6h; this is just how often we look. */
+declare const OAUTH_REFRESH_POLL_MS: number;
+declare function grantNeedsRefresh(expires: number, now?: number): boolean;
+//#endregion
 //#region src/ids.d.ts
 /** Basename of the DSH-owned multi-provider OAuth document. */
 declare const PI_LOGIN_AUTH_FILENAME = ".dsh-oauth-auth.json";
@@ -190,4 +207,4 @@ declare const name = "llm-oauth-login";
 declare const inject: string[];
 declare function apply(ctx: Context, config: Config): void;
 //#endregion
-export { Config, type Config as PluginConfig, LEGACY_PI_LOGIN_AUTH_FILENAME, type LoginChallenge, PI_LOGIN_AUTH_FILENAME, PI_LOGIN_AUTH_LOGIN_PATH, PI_LOGIN_AUTH_LOGOUT_PATH, PI_LOGIN_AUTH_STATUS_PATH, PI_LOGIN_BOOT_MARKER, PI_LOGIN_PROVIDERS, PI_LOGIN_ROUTE_PREFIX, PI_LOGIN_STREAM_IDLE_TIMEOUT_MS, type PiLoginAdapterOptions, type PiLoginAuthStatus, PiLoginCredentialStore, type PiLoginProvider, type PiLoginProviderStatus, PiLoginSession, QUOTA_HINT, RATE_LIMIT_HINT, TRANSIENT_HINT, TRANSIENT_MODEL_CODES, apply, catalogProvider, createPiLoginAdapter, extraModelsFor, harnessModels, harnessProvider, hintFailure, hintForCode, inject, isSafeAuthUrl, loginPiProvider, loginPiProviderSession, logoutPiProvider, name, piLoginAuthPath, piLoginProvider, piLoginRoutes, piLoginStatus, preferredModel, registerPiLoginAuthRoutes, safeMessage, withModelErrorHint };
+export { Config, type Config as PluginConfig, LEGACY_PI_LOGIN_AUTH_FILENAME, type LoginChallenge, OAUTH_REFRESH_POLL_MS, OAUTH_REFRESH_SOON_MS, PI_LOGIN_AUTH_FILENAME, PI_LOGIN_AUTH_LOGIN_PATH, PI_LOGIN_AUTH_LOGOUT_PATH, PI_LOGIN_AUTH_STATUS_PATH, PI_LOGIN_BOOT_MARKER, PI_LOGIN_PROVIDERS, PI_LOGIN_ROUTE_PREFIX, PI_LOGIN_STREAM_IDLE_TIMEOUT_MS, type PiLoginAdapterOptions, type PiLoginAuthStatus, PiLoginCredentialStore, type PiLoginProvider, type PiLoginProviderStatus, PiLoginSession, QUOTA_HINT, RATE_LIMIT_HINT, TRANSIENT_HINT, TRANSIENT_MODEL_CODES, apply, catalogProvider, createPiLoginAdapter, extraModelsFor, grantNeedsRefresh, harnessModels, harnessProvider, hintFailure, hintForCode, inject, isSafeAuthUrl, loginPiProvider, loginPiProviderSession, logoutPiProvider, name, piLoginAuthPath, piLoginProvider, piLoginRoutes, piLoginStatus, preferredModel, registerPiLoginAuthRoutes, safeMessage, withModelErrorHint };

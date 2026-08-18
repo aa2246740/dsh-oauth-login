@@ -168,9 +168,11 @@ class ProviderAuth {
 }
 
 export class PiLoginWebAuth {
+  private readonly session: PiLoginSession
   private readonly byId = new Map<string, ProviderAuth>()
 
   constructor(session: PiLoginSession) {
+    this.session = session
     for (const spec of PI_LOGIN_PROVIDERS) {
       this.byId.set(spec.id, new ProviderAuth(spec, session))
     }
@@ -183,6 +185,7 @@ export class PiLoginWebAuth {
   }
 
   async status(): Promise<PiLoginProviderStatus[]> {
+    await this.session.refreshStoredGrants()
     const out: PiLoginProviderStatus[] = []
     for (const spec of PI_LOGIN_PROVIDERS) {
       out.push({

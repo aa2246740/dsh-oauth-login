@@ -119,6 +119,7 @@ export async function run(argv: readonly string[]): Promise<number> {
         const ids = resolveIds(rawProvider)
         let failed = false
         process.stdout.write(`store: ${piLoginAuthPath()}\n`)
+        await session.refreshStoredGrants()
         for (const id of ids) {
           const [status] = await piLoginStatus(session.store, id)
           const spec = requirePiLoginProvider(id)

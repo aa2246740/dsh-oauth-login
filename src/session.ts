@@ -6,6 +6,13 @@ import { PI_LOGIN_PROVIDERS, piLoginProvider } from './catalog.ts'
 import type { PiLoginProvider } from './catalog.ts'
 import { configureOAuthHttpTransport } from './http.ts'
 import type { OAuthProxyResolution } from './http.ts'
+import {
+  grantNeedsRefresh,
+  markRefreshAttempt,
+  refreshAttemptKey,
+  refreshGrant,
+  refreshOnCooldown,
+} from './oauth-refresh.ts'
 import { allCatalogProviders, harnessProvider } from './provider.ts'
 import { PiLoginCredentialStore } from './store.ts'
 
@@ -58,5 +65,21 @@ export class PiLoginSession {
 
   async logout(id: string): Promise<void> {
     await this.store.delete(id)
+  }
+
+  /**
+   * Renew access tokens that are expired or close to expiry.
+   * Failures stay in the store; the next poll or chat retries.
+   */
+  async refreshStoredGrants(now = Date.now()): Promise<void> {
+    await this.ensureTransport()
+    for (const { providerId } of await this.store.list()) {
+      const credential = await this.store.read(providerId)
+      if (credential?.type !== 'oauth' || !grantNeedsRefresh(credential.expires, now)) continue
+      const key = refreshAttemptKey(this.store.filename, providerId)
+      if (refreshOnCooldown(key, now)) continue
+      markRefreshAttempt(key, now)
+      await refreshGrant(id => this.models.getAuth(id), providerId)
+    }
   }
 }
