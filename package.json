@@ -1,7 +1,7 @@
 {
   "name": "dsh-oauth-login",
   "description": "DSH-owned multi-provider OAuth login powered by Pi AI adapters. Independent store — never touches Pi Agent or official CLI auth files.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"

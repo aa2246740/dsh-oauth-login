@@ -1,7 +1,6 @@
 export const en = {
   nav: 'OAuth Login',
   title: 'OAuth Login',
-  intro: 'Independent DSH OAuth grants. Credentials stay in ~/.dsh/.dsh-oauth-auth.json and never touch Pi Agent or official CLI files.',
   loadingAccount: 'Loading accounts…',
   signedOut: 'Not signed in',
   signingIn: 'Waiting for authorization…',
@@ -10,16 +9,10 @@ export const en = {
   loginAgain: 'Sign in again',
   logout: 'Sign out',
   working: 'Working…',
-  userCode: 'If asked for a code, enter:',
-  openUrl: 'If the window did not open, open this URL:',
-  popupBlocked: 'The browser blocked the sign-in window. Open the URL below, or allow pop-ups and retry.',
+  userCode: 'Code',
+  openUrl: 'Authorize',
   requestFailed: 'The login request failed.',
-  isolation: 'Each provider is a separate OAuth grant. Pi Agent and official CLIs keep their own files; this plugin will not steal their refresh tokens.',
-  expires: 'Access token (auto-renews) expires',
-  models: 'Catalog models',
-  modelHint: 'Pick the `pi-…` route in the composer. Only signed-in providers appear in the model list.',
-  errorHint: 'Chat failures on a `pi-…` route keep the official code. RATE_LIMIT is request-rate or peak busy (many 429s). QUOTA is plan, usage-window, or balance exhaustion — retry will not refill it. TIMEOUT / TRANSPORT are network. After automatic retries end, send another message. If Continue fails or Chat says the API key is invalid, sign in again here or start a new chat. To raise the retry budget, set retryPolicy on the llm-oauth-login row.',
-  route: 'Route',
+  expires: 'Expires',
 } as const
 
 export type PiLoginKey = keyof typeof en
@@ -27,7 +20,6 @@ export type PiLoginKey = keyof typeof en
 export const zh: { [Key in PiLoginKey]: string } = {
   nav: 'OAuth 登录',
   title: 'OAuth 登录',
-  intro: 'DSH 独立的 OAuth 授权。凭据只写在 ~/.dsh/.dsh-oauth-auth.json，不会碰 Pi Agent 或官方 CLI 的文件。',
   loadingAccount: '正在加载账户…',
   signedOut: '尚未登录',
   signingIn: '正在等待授权…',
@@ -36,14 +28,8 @@ export const zh: { [Key in PiLoginKey]: string } = {
   loginAgain: '重新登录',
   logout: '退出',
   working: '处理中…',
-  userCode: '如果要求输入代码，请输入：',
-  openUrl: '如果窗口没有打开，请打开这个链接：',
-  popupBlocked: '浏览器阻止了登录窗口。请打开下方链接，或允许弹出窗口后重试。',
+  userCode: '授权码',
+  openUrl: '授权',
   requestFailed: '登录请求失败。',
-  isolation: '每个厂商都是独立授权。Pi Agent 和官方 CLI 继续用自己的文件，这个插件不会去抢它们的 refresh token。',
-  expires: 'Access token 到期（会自动续）',
-  models: '目录模型',
-  modelHint: '对话里选 `pi-…` 路由。只有已登录的提供方会出现在模型列表里。',
-  errorHint: '选 `pi-…` 时，失败码跟官方一样。RATE_LIMIT 是限流或高峰繁忙（很多 429 是这个）。QUOTA 是套餐、用量窗或余额用尽，再试也补不回来。TIMEOUT / TRANSPORT 是网络。自动重试用尽后再发一条。Continue 失败，或 Chat 写成 API key is invalid，请来这里重新登录或开新对话。要加大次数，给 llm-oauth-login 行加 retryPolicy。',
-  route: '路由',
+  expires: '到期',
 }

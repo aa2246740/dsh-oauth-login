@@ -40,27 +40,27 @@ export type PiLoginSettingsProps = Partial<PiLoginSettingsInjected>
  * Mirrors ModelsSection button vocabulary so OAuth cards match the rest of Settings.
  */
 const SETTINGS_CSS = `
-.dsh-pi-login-page { display:flex; flex-direction:column; gap:18px; max-width:760px; color:var(--dsw-alias-label-primary); }
+.dsh-pi-login-page { display:flex; flex-direction:column; gap:16px; max-width:640px; color:var(--dsw-alias-label-primary); }
 .dsh-pi-login-title { margin:0; font-size:20px; line-height:28px; font-weight:600; color:var(--dsw-alias-label-primary); }
-.dsh-pi-login-body { margin:0; font-size:14px; line-height:22px; color:var(--dsw-alias-label-secondary); }
-.dsh-pi-login-body-tight { margin:6px 0 0; font-size:14px; line-height:22px; color:var(--dsw-alias-label-secondary); }
-.dsh-pi-login-error { margin:0; font-size:14px; line-height:22px; color:var(--dsw-alias-state-error-primary); }
-.dsh-pi-login-stack { display:flex; flex-direction:column; gap:12px; }
+.dsh-pi-login-body { margin:0; font-size:13px; line-height:20px; color:var(--dsw-alias-label-secondary); }
+.dsh-pi-login-error { margin:0; font-size:13px; line-height:20px; color:var(--dsw-alias-state-error-primary); }
+.dsh-pi-login-stack { display:flex; flex-direction:column; gap:10px; }
 .dsh-pi-login-card {
-  display:flex; flex-direction:column; gap:12px; padding:16px 18px;
+  display:flex; flex-direction:column; gap:8px; padding:14px 16px;
   border:1px solid var(--dsw-alias-border-l2); border-radius:12px;
   background:var(--dsw-alias-bg-module-platform);
 }
-.dsh-pi-login-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
-.dsh-pi-login-name { margin:0; font-size:16px; font-weight:600; color:var(--dsw-alias-label-primary); }
-.dsh-pi-login-status { display:flex; align-items:center; gap:9px; font-size:15px; font-weight:500; color:var(--dsw-alias-label-primary); }
-.dsh-pi-login-dot { width:9px; height:9px; border-radius:50%; flex:0 0 auto; background:var(--dsw-alias-label-dimmed, #9aa0a6); }
+.dsh-pi-login-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+.dsh-pi-login-name { margin:0; font-size:15px; font-weight:600; color:var(--dsw-alias-label-primary); }
+.dsh-pi-login-status { display:flex; align-items:center; flex-wrap:wrap; gap:6px; font-size:13px; color:var(--dsw-alias-label-secondary); }
+.dsh-pi-login-dot { width:8px; height:8px; border-radius:50%; flex:0 0 auto; background:var(--dsw-alias-label-dimmed, #9aa0a6); }
 .dsh-pi-login-dot.is-signed-in { background:var(--dsw-alias-state-success-primary, #22a06b); }
 .dsh-pi-login-dot.is-error { background:var(--dsw-alias-state-error-primary, #d92d20); }
 .dsh-pi-login-dot.is-signing-in { background:var(--dsw-alias-brand-primary, #1677ff); }
+.dsh-pi-login-sep { color:var(--dsw-alias-label-dimmed, #9aa0a6); }
 .dsh-pi-login-btn {
   box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center;
-  min-height:34px; padding:6px 14px; border-radius:18px; font:inherit; font-size:14px; line-height:22px; cursor:pointer;
+  min-height:32px; padding:4px 14px; border-radius:16px; font:inherit; font-size:13px; line-height:20px; cursor:pointer;
 }
 .dsh-pi-login-btn:disabled { opacity:0.55; cursor:not-allowed; }
 .dsh-pi-login-btn-secondary {
@@ -81,17 +81,9 @@ const SETTINGS_CSS = `
 }
 .dsh-pi-login-code {
   font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size:20px; letter-spacing:0.08em; font-weight:600; color:var(--dsw-alias-label-primary);
+  font-size:18px; letter-spacing:0.08em; font-weight:600; color:var(--dsw-alias-label-primary);
 }
 .dsh-pi-login-link { color:var(--dsw-alias-brand-primary); word-break:break-all; }
-.dsh-pi-login-list { display:flex; flex-wrap:wrap; gap:8px; margin:0; padding:0; list-style:none; }
-.dsh-pi-login-chip {
-  font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size:12px; padding:4px 8px; border-radius:8px;
-  background:var(--dsw-alias-bg-layer-3);
-  color:var(--dsw-alias-label-primary);
-  border:1px solid var(--dsw-alias-border-l2);
-}
 `
 
 function ensureThemeStyles(): void {
@@ -179,10 +171,7 @@ export function PiLoginSettings({ t }: PiLoginSettingsProps) {
 
   return (
     <section className="dsh-pi-login-page" aria-labelledby="pi-login-settings-title">
-      <div>
-        <h2 id="pi-login-settings-title" className="dsh-pi-login-title">{t('title')}</h2>
-        <p className="dsh-pi-login-body-tight">{t('intro')}</p>
-      </div>
+      <h2 id="pi-login-settings-title" className="dsh-pi-login-title">{t('title')}</h2>
       {error !== undefined ? <p className="dsh-pi-login-error">{error}</p> : null}
       {providers === undefined
         ? <p className="dsh-pi-login-body">{t('loadingAccount')}</p>
@@ -204,19 +193,13 @@ export function PiLoginSettings({ t }: PiLoginSettingsProps) {
                     : account.status === 'signing-in'
                       ? 'dsh-pi-login-dot is-signing-in'
                       : 'dsh-pi-login-dot'
+                const expires = account.status === 'signed-in' && account.expiresAt !== undefined
+                  ? new Date(account.expiresAt).toLocaleString()
+                  : undefined
                 return (
                   <article key={provider.id} className="dsh-pi-login-card">
                     <div className="dsh-pi-login-row">
-                      <div>
-                        <p className="dsh-pi-login-name">{provider.displayName}</p>
-                        <p className="dsh-pi-login-body">{t('route')} <code>{provider.route}</code></p>
-                      </div>
-                      <div className="dsh-pi-login-status" role="status">
-                        <span aria-hidden="true" className={dotClass} />
-                        <span>{label}</span>
-                      </div>
-                    </div>
-                    <div>
+                      <p className="dsh-pi-login-name">{provider.displayName}</p>
                       {account.status === 'signed-in'
                         ? (
                             <button
@@ -239,19 +222,19 @@ export function PiLoginSettings({ t }: PiLoginSettingsProps) {
                             </button>
                           )}
                     </div>
+                    <div className="dsh-pi-login-status" role="status">
+                      <span aria-hidden="true" className={dotClass} />
+                      <span>{label}</span>
+                      {expires !== undefined
+                        ? (
+                            <>
+                              <span className="dsh-pi-login-sep" aria-hidden="true">·</span>
+                              <span>{t('expires')} {expires}</span>
+                            </>
+                          )
+                        : null}
+                    </div>
                     {account.status === 'error' ? <p className="dsh-pi-login-error">{account.message}</p> : null}
-                    {account.status === 'signed-in' && account.expiresAt !== undefined
-                      ? <p className="dsh-pi-login-body">{t('expires')} {new Date(account.expiresAt).toLocaleString()}</p>
-                      : null}
-                    {account.status === 'signed-in'
-                      ? (
-                          <ul className="dsh-pi-login-list">
-                            {(account.models ?? []).slice(0, 12).map(id => (
-                              <li key={id} className="dsh-pi-login-chip">{id}</li>
-                            ))}
-                          </ul>
-                        )
-                      : null}
                     {account.status === 'signing-in' && account.userCode !== undefined
                       ? <p className="dsh-pi-login-body">{t('userCode')} <span className="dsh-pi-login-code">{account.userCode}</span></p>
                       : null}
@@ -269,9 +252,6 @@ export function PiLoginSettings({ t }: PiLoginSettingsProps) {
               })}
             </div>
           )}
-      <p className="dsh-pi-login-body">{t('isolation')}</p>
-      <p className="dsh-pi-login-body">{t('modelHint')}</p>
-      <p className="dsh-pi-login-body">{t('errorHint')}</p>
     </section>
   )
 }
