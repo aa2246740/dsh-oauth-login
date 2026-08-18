@@ -1,0 +1,5 @@
+# Portable workshop overlay. `dshx overlay` / `verify` rewrite `name` to an
+# absolute path. Official installs use cordis.patch.yml (package name).
+- insert:
+    - id: llm-oauth-login
+      name: './src/index.ts'

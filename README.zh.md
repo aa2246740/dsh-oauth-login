@@ -38,6 +38,39 @@ dsh plugin --profile web exec dsh-oauth-login status
 
 对话里选 `pi-…` 路由。
 
+## 模型失败时
+
+本插件**不会**自己再写一套重试。Chat 用官方 `dsh-llm-retry` 和官方 `LlmError` 码。插件只在原文后面补一句说明，**不改 code**。
+
+| 码 | 通常是什么 | 怎么做 |
+|---|---|---|
+| `RATE_LIMIT` | 请求限流或高峰繁忙。很多 HTTP 429 落在这里。 | 等完默认两次自动重试，再发一条。 |
+| `QUOTA` | 套餐、用量窗、余额 / credits。 | 再试也补不回来，去查厂商套餐。 |
+| `TIMEOUT` / `TRANSPORT` | 空闲断流或网络。 | 本轮结束后再发一条。 |
+| `SERVER` | 对端 5xx / 部分 overloaded。 | 和其他暂时故障一样。 |
+| `AUTH` / `MISSING_CREDENTIAL` | 没登录或授权被拒。 | 设置 → OAuth 登录。Chat 可能把 AUTH 显示成 “API key is invalid”。 |
+
+429 **不等于**繁忙，也 **不等于**没钱。官方按厂商原文分类：像额度用尽就标 `QUOTA`，其余 429 标 `RATE_LIMIT`。5 小时 / 周限额只有原文说得像 usage-limit / quota 时才会进 `QUOTA`。
+
+默认暂时故障自动重试 **两次**，然后本轮结束。Continue 失败或输入框卡住，请开新对话。
+
+要加大次数而不改插件代码，给 `llm-oauth-login` 行加配置：
+
+```yaml
+- id: llm-oauth-login
+  name: dsh-oauth-login
+  config:
+    retryPolicy:
+      mode: normal
+      maxRetries: 4
+      backoff:
+        initialDelayMs: 1000
+        maxDelayMs: 30000
+        jitterRatio: 0.1
+```
+
+`mode: always` 会把每一种失败都重试到成功或取消，可能烧额度。Creator Mode / 宿主模型的超时走你在对话里选的那条路由，不是这个插件。
+
 ## 代理行为
 
 OAuth 登录和订阅模型请求会按以下顺序自动选择网络路径：

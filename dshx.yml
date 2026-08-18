@@ -1,0 +1,5 @@
+id: llm-oauth-login
+entry: src/index.ts
+marker: "[my-plugins/dsh-oauth-login] loaded"
+kind: function
+profile: web

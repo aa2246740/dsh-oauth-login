@@ -41,6 +41,39 @@ dsh plugin --profile web exec dsh-oauth-login status
 
 Pick a `pi-…` route in the composer.
 
+## When the model fails
+
+This plugin does **not** invent a private retry loop. Chat uses official `dsh-llm-retry` and official `LlmError` codes. The plugin only appends a short hint to the message and keeps the code.
+
+| Code | What it usually is | What to do |
+|---|---|---|
+| `RATE_LIMIT` | Request-rate or peak busy. Many HTTP 429s land here. | Wait out the two automatic retries, then send another message. |
+| `QUOTA` | Plan, usage window, or balance / credits. | Retry will not refill it. Check the provider plan. |
+| `TIMEOUT` / `TRANSPORT` | Idle stream or network. | Send another message after the turn ends. |
+| `SERVER` | Provider 5xx / some overloaded responses. | Same as other transient codes. |
+| `AUTH` / `MISSING_CREDENTIAL` | Grant missing or rejected. | Settings → OAuth Login. Chat may show AUTH as “API key is invalid”. |
+
+A 429 is **not** automatically “busy”, and it is **not** automatically “out of money”. Official classification reads the provider text: quota wording becomes `QUOTA`, other 429s become `RATE_LIMIT`. Five-hour or weekly windows are only `QUOTA` when the provider said so in those words.
+
+The default budget is **two** automatic retries for the transient codes above. After that the turn ends. If Continue fails or the composer stays stuck, start a new chat.
+
+To raise the budget without editing plugin code, patch the `llm-oauth-login` row:
+
+```yaml
+- id: llm-oauth-login
+  name: dsh-oauth-login
+  config:
+    retryPolicy:
+      mode: normal
+      maxRetries: 4
+      backoff:
+        initialDelayMs: 1000
+        maxDelayMs: 30000
+        jitterRatio: 0.1
+```
+
+`mode: always` retries every failure until success or cancel. That can spend paid quota. Creator Mode / host-model timeouts use whichever provider you selected in the composer, not this plugin.
+
 ## Proxy behavior
 
 OAuth and subscribed-provider requests automatically use the first available
