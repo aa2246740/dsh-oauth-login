@@ -3,6 +3,7 @@
 import { execFile } from 'node:child_process'
 import { connect } from 'node:net'
 import { EnvHttpProxyAgent, install, setGlobalDispatcher } from 'undici'
+import { installHostedOutputFetch } from './responses-tap.ts'
 
 const originalFetch = globalThis.fetch
 let installedFetch: typeof globalThis.fetch | undefined
@@ -225,5 +226,6 @@ export async function configureOAuthHttpTransport(
     install()
     installedFetch = globalThis.fetch
   }
+  installHostedOutputFetch()
   return resolution
 }

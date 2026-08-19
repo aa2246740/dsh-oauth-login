@@ -41,6 +41,33 @@ dsh plugin --profile web exec dsh-oauth-login status
 
 Pick a `pi-…` route in the composer.
 
+## Native search and image tools
+
+Official DSH always registers `web_search` and sends it through `ctx.web` (default: another DeepSeek Messages call with `DEEPSEEK_API_KEY`). That hides the hosted tools your OAuth account already has.
+
+On these routes, this plugin **removes** DSH `web_search` / `web_fetch` from the model-facing schema and attaches the provider tools instead:
+
+| Route | Hosted tools |
+|---|---|
+| `pi-xai` | `web_search`, `x_search`, `image_generation` |
+| `pi-openai-codex` | `web_search`, `image_generation` |
+| `pi-anthropic` | `web_search_20250305` |
+
+Copilot, OpenRouter, and Kimi are left alone — they have no single hosted tool this plugin can attach. DeepSeek official chat is unchanged.
+
+Hosted search still bills the OAuth subscription / tool quota of that provider. It does **not** need Exa, Perplexity, or DeepSeek Search. Server-side search traces are not executed as DSH tools. Empty Grok Think cards from hosted search hops (`tco_…` reasoning) are dropped. Reasoning that starts after the visible reply is also dropped, so a late "let me compile" Think cannot sit under the answer. Hosted images are saved through the attachment store and shown in the assistant turn.
+
+To keep DSH’s own search tool:
+
+```yaml
+- id: llm-oauth-login
+  name: dsh-oauth-login
+  config:
+    nativeTools: false
+```
+
+`nativeImage: false` keeps hosted search but drops image generation.
+
 ## When the model fails
 
 This plugin does **not** invent a private retry loop. Chat uses official `dsh-llm-retry` and official `LlmError` codes. The plugin only appends a short hint to the message and keeps the code.

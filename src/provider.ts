@@ -5,6 +5,12 @@ import type { Api, ApiKeyAuth, Model, Provider } from '@earendil-works/pi-ai'
 import { PI_LOGIN_PROVIDERS } from './catalog.ts'
 import type { PiLoginProvider } from './catalog.ts'
 import { extraModelsFor } from './extra-models.ts'
+import {
+  DEFAULT_NATIVE_TOOL_POLICY,
+  filterPiContext,
+  wrapOnPayload,
+} from './native-tools.ts'
+import type { NativeToolPolicy } from './native-tools.ts'
 
 function harnessApiKeyAuth(name: string): ApiKeyAuth {
   return {
@@ -53,7 +59,10 @@ export function preferredModel(
   return models[0]?.id ?? spec.id
 }
 
-export function harnessProvider(spec: PiLoginProvider): Provider {
+export function harnessProvider(
+  spec: PiLoginProvider,
+  native: NativeToolPolicy = DEFAULT_NATIVE_TOOL_POLICY,
+): Provider {
   const base = catalogProvider(spec.id)
   return {
     id: spec.route,
@@ -61,8 +70,22 @@ export function harnessProvider(spec: PiLoginProvider): Provider {
     ...base.baseUrl === undefined ? {} : { baseUrl: base.baseUrl },
     auth: { ...base.auth, apiKey: harnessApiKeyAuth(spec.displayName) },
     getModels: () => harnessModels(spec),
-    stream: (model, context, options) => base.stream(model, context, options),
-    streamSimple: (model, context, options) => base.streamSimple(model, context, options),
+    stream: (model, context, options) => {
+      const onPayload = wrapOnPayload(options?.onPayload, spec.id, native)
+      return base.stream(
+        model,
+        filterPiContext(context, spec.id, native),
+        (onPayload === options?.onPayload ? options : { ...options, onPayload }) as typeof options,
+      )
+    },
+    streamSimple: (model, context, options) => {
+      const onPayload = wrapOnPayload(options?.onPayload, spec.id, native)
+      return base.streamSimple(
+        model,
+        filterPiContext(context, spec.id, native),
+        (onPayload === options?.onPayload ? options : { ...options, onPayload }) as typeof options,
+      )
+    },
   }
 }
 

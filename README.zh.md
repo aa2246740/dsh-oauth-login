@@ -38,6 +38,33 @@ dsh plugin --profile web exec dsh-oauth-login status
 
 对话里选 `pi-…` 路由。
 
+## 原生搜索和出图
+
+官方 DSH 会注册 `web_search`，再经 `ctx.web` 打出去（默认又用 `DEEPSEEK_API_KEY` 走一轮 DeepSeek Messages）。OAuth 账号自己的 hosted tool 就被盖住了。
+
+在这些路由上，本插件会从模型可见 schema 里**拿掉** DSH 的 `web_search` / `web_fetch`，改挂厂商自己的工具：
+
+| 路由 | Hosted tools |
+|---|---|
+| `pi-xai` | `web_search`、`x_search`、`image_generation` |
+| `pi-openai-codex` | `web_search`、`image_generation` |
+| `pi-anthropic` | `web_search_20250305` |
+
+Copilot / OpenRouter / Kimi 不动：没有一份能稳定挂上的 hosted tool。DeepSeek 官方对话也不改。
+
+原生搜索仍算进该厂商的订阅 / tool 额度，不再要 Exa、Perplexity 或 DeepSeek Search。服务端搜索痕迹不会再当成 DSH 工具去跑。Grok 搜索 hop 产生的空 Think，以及正文开始之后才冒出来的英文旁白 Think，会从流里丢掉，避免钉在回复下面。托管出图会写入附件库，并显示在助手那一轮里。
+
+若要继续用 DSH 自己的搜索：
+
+```yaml
+- id: llm-oauth-login
+  name: dsh-oauth-login
+  config:
+    nativeTools: false
+```
+
+`nativeImage: false` 只留搜索、去掉出图。
+
 ## 模型失败时
 
 本插件**不会**自己再写一套重试。Chat 用官方 `dsh-llm-retry` 和官方 `LlmError` 码。插件只在原文后面补一句说明，**不改 code**。

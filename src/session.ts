@@ -13,16 +13,23 @@ import {
   refreshGrant,
   refreshOnCooldown,
 } from './oauth-refresh.ts'
+import { DEFAULT_NATIVE_TOOL_POLICY } from './native-tools.ts'
+import type { NativeToolPolicy } from './native-tools.ts'
 import { allCatalogProviders, harnessProvider } from './provider.ts'
 import { PiLoginCredentialStore } from './store.ts'
 
 export class PiLoginSession {
   readonly store: PiLoginCredentialStore
   readonly models: MutableModels
+  readonly native: NativeToolPolicy
   private transportPromise?: Promise<OAuthProxyResolution>
 
-  constructor(store: PiLoginCredentialStore = new PiLoginCredentialStore()) {
+  constructor(
+    store: PiLoginCredentialStore = new PiLoginCredentialStore(),
+    native: NativeToolPolicy = DEFAULT_NATIVE_TOOL_POLICY,
+  ) {
     this.store = store
+    this.native = native
     this.models = createModels({ credentials: store })
     for (const provider of allCatalogProviders()) this.models.setProvider(provider)
   }
@@ -45,7 +52,7 @@ export class PiLoginSession {
   }
 
   provider(id: string) {
-    return harnessProvider(this.spec(id))
+    return harnessProvider(this.spec(id), this.native)
   }
 
   visibleModels(id: string) {

@@ -13,9 +13,18 @@ import { PI_LOGIN_STREAM_IDLE_TIMEOUT_MS } from './ids.ts'
 export interface Config {
   streamIdleTimeoutMs?: number
   retryPolicy?: RetryPolicyConfig
+  /**
+   * Hide DSH web_search / web_fetch on OAuth routes that already have hosted
+   * search, and attach those hosted tools to the provider request.
+   */
+  nativeTools?: boolean
+  /** Also attach hosted image generation on Grok and Codex. */
+  nativeImage?: boolean
 }
 
 export const Config: z<Config> = z.object({
   streamIdleTimeoutMs: z.number().min(1).default(PI_LOGIN_STREAM_IDLE_TIMEOUT_MS),
   retryPolicy: RetryPolicySchema,
+  nativeTools: z.boolean().default(true),
+  nativeImage: z.boolean().default(true),
 })

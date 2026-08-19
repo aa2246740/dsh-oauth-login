@@ -10,10 +10,30 @@ import type { AdapterRegistrationHandle } from '@deepseek-ai/dsh-llm'
 import { createPiLoginAdapter } from './adapter.ts'
 import { registerPiLoginAuthRoutes } from './auth-routes.ts'
 import { piLoginRoutes } from './catalog.ts'
+import { maskDshWebAssembly, nativePlanForRoute } from './native-tools.ts'
 import { OAUTH_REFRESH_POLL_MS } from './oauth-refresh.ts'
 import type { Config } from './plugin-config.ts'
 import { PiLoginSession } from './session.ts'
 import { PiLoginCredentialStore } from './store.ts'
+
+type NativeAssembly = {
+  tools: { name: string }[]
+  sections: { name: string; text: string }[]
+}
+
+type NativeAssembleContext = {
+  agent?: { options?: { provider?: string } }
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    'system-prompt/assemble'(
+      assembly: NativeAssembly,
+      context: NativeAssembleContext,
+      next: () => Promise<NativeAssembly>,
+    ): Promise<NativeAssembly>
+  }
+}
 
 export { createPiLoginAdapter } from './adapter.ts'
 export type { PiLoginAdapterOptions } from './adapter.ts'
@@ -34,6 +54,25 @@ export type { LoginChallenge, PiLoginProviderStatus } from './auth-routes.ts'
 export { PI_LOGIN_PROVIDERS, piLoginProvider, piLoginRoutes } from './catalog.ts'
 export type { PiLoginProvider } from './catalog.ts'
 export { extraModelsFor } from './extra-models.ts'
+export {
+  applyNativeToolsToPayload,
+  DEFAULT_NATIVE_TOOL_POLICY,
+  filterHostedServerToolTraces,
+  filterXaiServerToolTraces,
+  isHostedSearchReasoningReplay,
+  isHostedServerToolCall,
+  isXaiServerXSearchCall,
+  nativePlan,
+  nativePlanForRoute,
+} from './native-tools.ts'
+export {
+  collectHostedImagesFromEvent,
+  decodeHostedImage,
+  injectHostedImages,
+  sniffImageMediaType,
+  stripAssistantImages,
+} from './hosted-images.ts'
+export type { NativeToolPlan, NativeToolPolicy } from './native-tools.ts'
 export {
   grantNeedsRefresh,
   OAUTH_REFRESH_POLL_MS,
@@ -78,7 +117,11 @@ async function syncAuthenticatedRoutes(
 
 export function apply(ctx: Context, config: Config): void {
   console.log('[my-plugins/dsh-oauth-login] loaded')
-  const session = new PiLoginSession(new PiLoginCredentialStore())
+  const native = {
+    enabled: config.nativeTools !== false,
+    image: config.nativeImage !== false,
+  }
+  const session = new PiLoginSession(new PiLoginCredentialStore(), native)
   // Initial registration needs ≥1 route; replace() may then empty the set.
   const registration = ctx.llm.registerAdapter(
     piLoginRoutes(),
@@ -98,5 +141,12 @@ export function apply(ctx: Context, config: Config): void {
   }, 'dsh-oauth-login: refresh oauth grants')
   ctx.inject(['webServer'], webCtx => {
     registerPiLoginAuthRoutes(webCtx, session, { onAuthChanged: refreshRoutes })
+  })
+  ctx.inject(['systemPrompt'], promptCtx => {
+    promptCtx.on('system-prompt/assemble', async (_assembly, context, next) => {
+      const assembled = await next()
+      const plan = nativePlanForRoute(context.agent?.options?.provider, session.native)
+      return plan === undefined ? assembled : maskDshWebAssembly(assembled, plan)
+    })
   })
 }

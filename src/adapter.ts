@@ -3,12 +3,20 @@
 import { LlmError, resolveRetryPolicy } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, RetryPolicyConfig, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
-import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
+import type {
+  PiAiAdapterOptions as BasePiAiAdapterOptions,
+  ResolvedPiAiProviderProfile,
+} from '@deepseek-ai/dsh-llm-pi-ai'
 import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import { PI_LOGIN_PROVIDERS, piLoginProviderByRoute } from './catalog.ts'
+import { iterateInCapture } from './hosted-capture.ts'
+import type { HostedCapture } from './hosted-capture.ts'
+import { injectHostedImages, stripAssistantImages } from './hosted-images.ts'
 import { PI_LOGIN_STREAM_IDLE_TIMEOUT_MS } from './ids.ts'
 import { hintFailure, withModelErrorHint } from './model-error-hint.ts'
 import type { PiLoginSession } from './session.ts'
+import { filterHostedServerToolTraces, nativePlanForRoute } from './native-tools.ts'
+import type { NativeToolPolicy } from './native-tools.ts'
 
 export interface PiLoginAdapterOptions {
   streamIdleTimeoutMs?: number
@@ -21,9 +29,29 @@ export interface PiLoginAdapterOptions {
  * chunks, not thrown errors, so both paths get the same hint.
  */
 class PiLoginAdapter extends PiAiAdapter {
+  constructor(
+    config: BasePiAiAdapterOptions,
+    private readonly native: NativeToolPolicy,
+    private readonly resolveAttachments: () => AttachmentStore | undefined,
+  ) {
+    super(config)
+  }
+
   override async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+    const capture: HostedCapture = { images: [] }
+    const sanitized: GenerateOptions = {
+      ...options,
+      messages: stripAssistantImages(options.messages),
+    }
     try {
-      for await (const chunk of super.stream(options)) {
+      const raw = iterateInCapture(capture, super.stream(sanitized))
+      const plan = this.native.enabled ? nativePlanForRoute(sanitized.provider, this.native) : undefined
+      const filtered = plan === undefined ? raw : filterHostedServerToolTraces(raw)
+      const attachments = this.native.image ? this.resolveAttachments() : undefined
+      const source = attachments === undefined
+        ? filtered
+        : injectHostedImages(filtered, capture, input => attachments.saveImage(input))
+      for await (const chunk of source) {
         if (chunk.type === 'finish' && chunk.reason.kind === 'error') {
           yield {
             ...chunk,
@@ -81,5 +109,5 @@ export function createPiLoginAdapter(
       return apiKey
     },
     resolveAttachments,
-  })
+  }, session.native, resolveAttachments)
 }
