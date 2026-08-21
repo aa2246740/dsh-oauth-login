@@ -7,8 +7,7 @@ import type { PiLoginProvider } from './catalog.ts'
 import { extraModelsFor } from './extra-models.ts'
 import {
   DEFAULT_NATIVE_TOOL_POLICY,
-  filterPiContext,
-  wrapOnPayload,
+  prepareNativeToolRequest,
 } from './native-tools.ts'
 import type { NativeToolPolicy } from './native-tools.ts'
 
@@ -71,19 +70,22 @@ export function harnessProvider(
     auth: { ...base.auth, apiKey: harnessApiKeyAuth(spec.displayName) },
     getModels: () => harnessModels(spec),
     stream: (model, context, options) => {
-      const onPayload = wrapOnPayload(options?.onPayload, spec.id, native)
+      const request = prepareNativeToolRequest(context, options ?? {}, spec.id, native)
       return base.stream(
         model,
-        filterPiContext(context, spec.id, native),
-        (onPayload === options?.onPayload ? options : { ...options, onPayload }) as typeof options,
+        request.context,
+        // pi-ai's generic ApiStreamOptions<T> is a conditional type. The
+        // preparation step preserves every provider-specific field and only
+        // adds StreamOptions.onPayload, but TypeScript cannot prove that for T.
+        request.options as typeof options,
       )
     },
     streamSimple: (model, context, options) => {
-      const onPayload = wrapOnPayload(options?.onPayload, spec.id, native)
+      const request = prepareNativeToolRequest(context, options ?? {}, spec.id, native)
       return base.streamSimple(
         model,
-        filterPiContext(context, spec.id, native),
-        (onPayload === options?.onPayload ? options : { ...options, onPayload }) as typeof options,
+        request.context,
+        request.options,
       )
     },
   }

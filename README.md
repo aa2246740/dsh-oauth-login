@@ -57,7 +57,7 @@ Copilot, OpenRouter, and Kimi are left alone — they have no single hosted tool
 
 Hosted search still bills the OAuth subscription / tool quota of that provider. It does **not** need Exa, Perplexity, or DeepSeek Search. Server-side search traces are not executed as DSH tools. Empty Grok Think cards from hosted search hops (`tco_…` reasoning) are dropped. Reasoning that starts after the visible reply is also dropped, so a late "let me compile" Think cannot sit under the answer. Hosted images are saved through the attachment store and shown in the assistant turn.
 
-Hosted tools are attached only when the caller supplies a `tools` list. Auxiliary text-only calls that omit `tools`, including approval reviewers and title generation, stay text-only.
+Hosted tools are a per-request capability, not a provider-wide default. Context filtering and payload injection are decided together only when the caller supplies a `tools` list. Auxiliary text-only calls that omit `tools`, including approval reviewers and title generation, stay text-only even when a provider serializer later emits an empty `tools: []` field.
 
 To keep DSH’s own search tool:
 

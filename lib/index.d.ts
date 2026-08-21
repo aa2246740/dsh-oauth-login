@@ -1,9 +1,9 @@
 import { LlmFailure, Message, RetryPolicyConfig, StreamChunk } from "@deepseek-ai/dsh-llm";
 import { PiAiAdapter } from "@deepseek-ai/dsh-llm-pi-ai";
 import { AsyncLocalStorage } from "node:async_hooks";
-import { Api, AuthInteraction, Credential, CredentialInfo, CredentialStore, Model, MutableModels, Provider } from "@earendil-works/pi-ai";
+import { Api, AuthInteraction, Context, Credential, CredentialInfo, CredentialStore, Model, MutableModels, Provider, StreamOptions } from "@earendil-works/pi-ai";
 import z from "@deepseek-ai/schemastery";
-import { Context } from "@deepseek-ai/cordis";
+import { Context as Context$1 } from "@deepseek-ai/cordis";
 import { AttachmentStore, ImageAttachmentRef, ImageMediaType, SaveImageAttachment } from "@deepseek-ai/dsh-attachment";
 //#region src/plugin-config.d.ts
 /**
@@ -97,6 +97,18 @@ declare function filterHostedServerToolTraces(source: AsyncIterable<StreamChunk>
 /** @deprecated Use {@link filterHostedServerToolTraces}. */
 declare const filterXaiServerToolTraces: typeof filterHostedServerToolTraces;
 declare function applyNativeToolsToPayload(payload: unknown, providerId: string, policy?: NativeToolPolicy): unknown;
+/**
+ * Prepare one provider request as a single unit.
+ *
+ * Native tools are a property of this request, not of the provider account.
+ * A context without tools is a text-only call (reviewers, summaries, titles,
+ * and similar utility traffic), so its payload hook must stay untouched even
+ * when the provider serializer later emits `tools: []`.
+ */
+declare function prepareNativeToolRequest<TOptions extends StreamOptions>(context: Context, options: TOptions, providerId: string, policy?: NativeToolPolicy): {
+  context: Context;
+  options: TOptions & StreamOptions;
+};
 //#endregion
 //#region src/store.d.ts
 declare function piLoginAuthPath(dshHome?: string): string;
@@ -187,7 +199,7 @@ interface PiLoginAuthRouteOptions {
   /** Called after a successful sign-in or sign-out so the host can refresh LLM routes. */
   onAuthChanged?: () => void | Promise<void>;
 }
-declare function registerPiLoginAuthRoutes(ctx: Context, session: PiLoginSession, options?: PiLoginAuthRouteOptions): void;
+declare function registerPiLoginAuthRoutes(ctx: Context$1, session: PiLoginSession, options?: PiLoginAuthRouteOptions): void;
 //#endregion
 //#region src/extra-models.d.ts
 /**
@@ -300,6 +312,6 @@ declare module '@deepseek-ai/cordis' {
 }
 declare const name = "llm-oauth-login";
 declare const inject: string[];
-declare function apply(ctx: Context, config: Config): void;
+declare function apply(ctx: Context$1, config: Config): void;
 //#endregion
-export { Config, type Config as PluginConfig, DEFAULT_NATIVE_TOOL_POLICY, LEGACY_PI_LOGIN_AUTH_FILENAME, type LoginChallenge, type NativeToolPlan, type NativeToolPolicy, OAUTH_REFRESH_POLL_MS, OAUTH_REFRESH_SOON_MS, PI_LOGIN_AUTH_FILENAME, PI_LOGIN_AUTH_LOGIN_PATH, PI_LOGIN_AUTH_LOGOUT_PATH, PI_LOGIN_AUTH_STATUS_PATH, PI_LOGIN_BOOT_MARKER, PI_LOGIN_PROVIDERS, PI_LOGIN_ROUTE_PREFIX, PI_LOGIN_STREAM_IDLE_TIMEOUT_MS, type PiLoginAdapterOptions, type PiLoginAuthStatus, PiLoginCredentialStore, type PiLoginProvider, type PiLoginProviderStatus, PiLoginSession, QUOTA_HINT, RATE_LIMIT_HINT, TRANSIENT_HINT, TRANSIENT_MODEL_CODES, apply, applyNativeToolsToPayload, catalogProvider, collectHostedImagesFromEvent, createPiLoginAdapter, decodeHostedImage, extraModelsFor, filterHostedServerToolTraces, filterXaiServerToolTraces, grantNeedsRefresh, harnessModels, harnessProvider, hintFailure, hintForCode, inject, injectHostedImages, isHostedSearchReasoningReplay, isHostedServerToolCall, isSafeAuthUrl, isXaiServerXSearchCall, loginPiProvider, loginPiProviderSession, logoutPiProvider, name, nativePlan, nativePlanForRoute, piLoginAuthPath, piLoginProvider, piLoginRoutes, piLoginStatus, preferredModel, registerPiLoginAuthRoutes, safeMessage, sniffImageMediaType, stripAssistantImages, withModelErrorHint };
+export { Config, type Config as PluginConfig, DEFAULT_NATIVE_TOOL_POLICY, LEGACY_PI_LOGIN_AUTH_FILENAME, type LoginChallenge, type NativeToolPlan, type NativeToolPolicy, OAUTH_REFRESH_POLL_MS, OAUTH_REFRESH_SOON_MS, PI_LOGIN_AUTH_FILENAME, PI_LOGIN_AUTH_LOGIN_PATH, PI_LOGIN_AUTH_LOGOUT_PATH, PI_LOGIN_AUTH_STATUS_PATH, PI_LOGIN_BOOT_MARKER, PI_LOGIN_PROVIDERS, PI_LOGIN_ROUTE_PREFIX, PI_LOGIN_STREAM_IDLE_TIMEOUT_MS, type PiLoginAdapterOptions, type PiLoginAuthStatus, PiLoginCredentialStore, type PiLoginProvider, type PiLoginProviderStatus, PiLoginSession, QUOTA_HINT, RATE_LIMIT_HINT, TRANSIENT_HINT, TRANSIENT_MODEL_CODES, apply, applyNativeToolsToPayload, catalogProvider, collectHostedImagesFromEvent, createPiLoginAdapter, decodeHostedImage, extraModelsFor, filterHostedServerToolTraces, filterXaiServerToolTraces, grantNeedsRefresh, harnessModels, harnessProvider, hintFailure, hintForCode, inject, injectHostedImages, isHostedSearchReasoningReplay, isHostedServerToolCall, isSafeAuthUrl, isXaiServerXSearchCall, loginPiProvider, loginPiProviderSession, logoutPiProvider, name, nativePlan, nativePlanForRoute, piLoginAuthPath, piLoginProvider, piLoginRoutes, piLoginStatus, preferredModel, prepareNativeToolRequest, registerPiLoginAuthRoutes, safeMessage, sniffImageMediaType, stripAssistantImages, withModelErrorHint };

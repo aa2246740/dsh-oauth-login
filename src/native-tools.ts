@@ -3,7 +3,7 @@
  * DSH's web_search function tool would hide those and bill a second key.
  */
 
-import type { Context as PiContext, SimpleStreamOptions, StreamOptions } from '@earendil-works/pi-ai'
+import type { Context as PiContext, StreamOptions } from '@earendil-works/pi-ai'
 import type { ReplayEnvelope, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { piLoginProviderByRoute } from './catalog.ts'
 
@@ -379,14 +379,30 @@ export function filterPiContext(
   }
 }
 
-export function withNativeStreamOptions(
-  options: SimpleStreamOptions | undefined,
+/**
+ * Prepare one provider request as a single unit.
+ *
+ * Native tools are a property of this request, not of the provider account.
+ * A context without tools is a text-only call (reviewers, summaries, titles,
+ * and similar utility traffic), so its payload hook must stay untouched even
+ * when the provider serializer later emits `tools: []`.
+ */
+export function prepareNativeToolRequest<TOptions extends StreamOptions>(
+  context: PiContext,
+  options: TOptions,
   providerId: string,
   policy: NativeToolPolicy = DEFAULT_NATIVE_TOOL_POLICY,
-): SimpleStreamOptions | undefined {
+): { context: PiContext; options: TOptions & StreamOptions } {
+  if (context.tools === undefined || nativePlan(providerId, policy) === undefined) {
+    return { context, options }
+  }
   const onPayload = wrapOnPayload(options?.onPayload, providerId, policy)
-  if (onPayload === options?.onPayload) return options
-  return { ...options, onPayload }
+  return {
+    context: filterPiContext(context, providerId, policy),
+    options: onPayload === options.onPayload
+      ? options
+      : Object.assign({}, options, { onPayload }),
+  }
 }
 
 export function maskDshWebAssembly<

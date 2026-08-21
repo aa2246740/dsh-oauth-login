@@ -64,6 +64,7 @@ export {
   isXaiServerXSearchCall,
   nativePlan,
   nativePlanForRoute,
+  prepareNativeToolRequest,
 } from './native-tools.ts'
 export {
   collectHostedImagesFromEvent,

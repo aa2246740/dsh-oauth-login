@@ -12,8 +12,10 @@ import {
   maskDshWebAssembly,
   nativePlan,
   nativePlanForRoute,
+  prepareNativeToolRequest,
   wrapOnPayload,
 } from '../src/native-tools.ts'
+import type { StreamOptions } from '@earendil-works/pi-ai'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 
 async function collect(source: AsyncIterable<StreamChunk>): Promise<StreamChunk[]> {
@@ -319,6 +321,45 @@ describe('native OAuth tools', () => {
         { type: 'web_search' },
         { type: 'x_search' },
         { type: 'image_generation' },
+      ],
+    })
+  })
+
+  it('keeps a text-only request text-only when the provider serializer emits tools: []', async () => {
+    const context = { messages: [] }
+    const options: StreamOptions = {
+      onPayload: (payload: unknown): unknown => payload,
+    }
+    const prepared = prepareNativeToolRequest(context, options, 'openai-codex')
+
+    expect(prepared.context).toBe(context)
+    expect(prepared.options).toBe(options)
+    await expect(Promise.resolve(prepared.options.onPayload?.({ tools: [] }, {
+      id: 'gpt-5.3-codex-spark',
+    } as never)))
+      .resolves.toEqual({ tools: [] })
+  })
+
+  it('prepares context filtering and hosted payload tools together for an agent request', async () => {
+    const prepared = prepareNativeToolRequest({
+      messages: [],
+      tools: [
+        { name: 'bash', description: '', parameters: {} },
+        { name: 'web_search', description: '', parameters: {} },
+      ],
+    }, {}, 'openai-codex')
+
+    expect(prepared.context.tools?.map(tool => tool.name)).toEqual(['bash'])
+    await expect(Promise.resolve(prepared.options.onPayload?.({
+      tools: [
+        { type: 'function', name: 'bash', parameters: {} },
+        { type: 'function', name: 'web_search', parameters: {} },
+      ],
+    }, { id: 'gpt-5.3-codex-spark' } as never))).resolves.toEqual({
+      tools: [
+        { type: 'web_search' },
+        { type: 'image_generation' },
+        { type: 'function', name: 'bash', parameters: {} },
       ],
     })
   })
