@@ -4,7 +4,7 @@
  */
 
 import type { Context as PiContext, SimpleStreamOptions, StreamOptions } from '@earendil-works/pi-ai'
-import type { StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { ReplayEnvelope, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { piLoginProviderByRoute } from './catalog.ts'
 
 /** DSH model-facing tools that steal traffic from a subscribed provider. */
@@ -182,11 +182,14 @@ export function isHostedSearchReasoningReplay(block: unknown): boolean {
 }
 
 function filterPiReplayState(
-  replayState: unknown,
+  replayState: ReplayEnvelope | undefined,
   dropped: ReadonlySet<number>,
   forceStop: boolean,
-): unknown {
-  if (!isRecord(replayState) || replayState.kind !== 'pi-ai' || !Array.isArray(replayState.blocks)) {
+): ReplayEnvelope | undefined {
+  if (replayState === undefined
+    || !isRecord(replayState.response)
+    || replayState.response.kind !== 'pi-ai'
+    || !Array.isArray(replayState.blocks)) {
     return replayState
   }
   let seenText = false
@@ -203,7 +206,10 @@ function filterPiReplayState(
       if (seenText && isRecord(block) && block.type === 'reasoning') return false
       return true
     }),
-    ...forceStop ? { stopReason: 'stop' } : {},
+    response: {
+      ...replayState.response,
+      ...forceStop ? { stopReason: 'stop' } : {},
+    },
   }
 }
 
@@ -333,8 +339,8 @@ export function applyNativeToolsToPayload(
   policy: NativeToolPolicy = DEFAULT_NATIVE_TOOL_POLICY,
 ): unknown {
   const plan = nativePlan(providerId, policy)
-  if (plan === undefined || !isRecord(payload)) return payload
-  const current = Array.isArray(payload.tools) ? payload.tools : []
+  if (plan === undefined || !isRecord(payload) || !Array.isArray(payload.tools)) return payload
+  const current = payload.tools
   const kept = current.filter(tool => !isDshWebFunctionTool(tool))
   const seen = new Set(
     kept.filter(isRecord).map(tool => hostedToolKey(tool)),

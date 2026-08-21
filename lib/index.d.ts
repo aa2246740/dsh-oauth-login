@@ -8,7 +8,7 @@ import { AttachmentStore, ImageAttachmentRef, ImageMediaType, SaveImageAttachmen
 //#region src/plugin-config.d.ts
 /**
  * `retryPolicy` is executed by shipped `dsh-llm-retry`, not by this plugin.
- * Omission keeps the official normal default (2 retries for TIMEOUT /
+ * Omission keeps the RC8 official normal default (5 retries for TIMEOUT /
  * TRANSPORT / SERVER / RATE_LIMIT / EMPTY_RESPONSE).
  */
 interface Config {

@@ -64,8 +64,11 @@ describe('native OAuth tools', () => {
         type: 'finish',
         reason: { kind: 'tool-calls' },
         replayState: {
-          kind: 'pi-ai', version: 1, api: 'openai-responses', provider: 'pi-xai', model: 'grok-4.6',
-          stopReason: 'toolUse', blocks: [{ type: 'text' }, { type: 'tool-call' }],
+          response: {
+            kind: 'pi-ai', version: 2, api: 'openai-responses', provider: 'pi-xai', model: 'grok-4.6',
+            stopReason: 'toolUse',
+          },
+          blocks: [{ type: 'text' }, { type: 'tool-call' }],
         },
       },
     ]
@@ -75,7 +78,7 @@ describe('native OAuth tools', () => {
     const finish = result.find(chunk => chunk.type === 'finish')
     expect(finish).toMatchObject({
       type: 'finish', reason: { kind: 'stop' },
-      replayState: { stopReason: 'stop', blocks: [{ type: 'text' }] },
+      replayState: { response: { stopReason: 'stop' }, blocks: [{ type: 'text' }] },
     })
   })
 
@@ -144,8 +147,10 @@ describe('native OAuth tools', () => {
         type: 'finish',
         reason: { kind: 'stop' },
         replayState: {
-          kind: 'pi-ai', version: 1, api: 'openai-responses', provider: 'pi-xai', model: 'grok-4.6',
-          stopReason: 'stop',
+          response: {
+            kind: 'pi-ai', version: 2, api: 'openai-responses', provider: 'pi-xai', model: 'grok-4.6',
+            stopReason: 'stop',
+          },
           blocks: [
             { type: 'reasoning', thinkingSignature: JSON.stringify({ id: 'rs_real', type: 'reasoning' }) },
             { type: 'text' },
@@ -203,8 +208,10 @@ describe('native OAuth tools', () => {
         type: 'finish',
         reason: { kind: 'stop' },
         replayState: {
-          kind: 'pi-ai', version: 1, api: 'openai-responses', provider: 'pi-xai', model: 'grok-4.6',
-          stopReason: 'stop',
+          response: {
+            kind: 'pi-ai', version: 2, api: 'openai-responses', provider: 'pi-xai', model: 'grok-4.6',
+            stopReason: 'stop',
+          },
           blocks: [
             { type: 'reasoning', thinkingSignature: JSON.stringify({ id: 'rs_open', type: 'reasoning' }) },
             { type: 'text' },
@@ -292,6 +299,26 @@ describe('native OAuth tools', () => {
         { type: 'x_search' },
         { type: 'image_generation' },
         { type: 'function', name: 'bash', parameters: {} },
+      ],
+    })
+  })
+
+  it('leaves a text-only payload without a tools field untouched', () => {
+    const payload = {
+      model: 'grok-4.5',
+      input: 'Return one JSON approval decision.',
+    }
+
+    expect(applyNativeToolsToPayload(payload, 'xai')).toBe(payload)
+    expect(payload).not.toHaveProperty('tools')
+  })
+
+  it('attaches hosted tools when the caller explicitly supplies an empty tool list', () => {
+    expect(applyNativeToolsToPayload({ tools: [] }, 'xai')).toEqual({
+      tools: [
+        { type: 'web_search' },
+        { type: 'x_search' },
+        { type: 'image_generation' },
       ],
     })
   })

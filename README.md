@@ -57,6 +57,8 @@ Copilot, OpenRouter, and Kimi are left alone — they have no single hosted tool
 
 Hosted search still bills the OAuth subscription / tool quota of that provider. It does **not** need Exa, Perplexity, or DeepSeek Search. Server-side search traces are not executed as DSH tools. Empty Grok Think cards from hosted search hops (`tco_…` reasoning) are dropped. Reasoning that starts after the visible reply is also dropped, so a late "let me compile" Think cannot sit under the answer. Hosted images are saved through the attachment store and shown in the assistant turn.
 
+Hosted tools are attached only when the caller supplies a `tools` list. Auxiliary text-only calls that omit `tools`, including approval reviewers and title generation, stay text-only.
+
 To keep DSH’s own search tool:
 
 ```yaml
@@ -74,7 +76,7 @@ This plugin does **not** invent a private retry loop. Chat uses official `dsh-ll
 
 | Code | What it usually is | What to do |
 |---|---|---|
-| `RATE_LIMIT` | Request-rate or peak busy. Many HTTP 429s land here. | Wait out the two automatic retries, then send another message. |
+| `RATE_LIMIT` | Request-rate or peak busy. Many HTTP 429s land here. | Wait out the five automatic retries, then send another message. |
 | `QUOTA` | Plan, usage window, or balance / credits. | Retry will not refill it. Check the provider plan. |
 | `TIMEOUT` / `TRANSPORT` | Idle stream or network. | Send another message after the turn ends. |
 | `SERVER` | Provider 5xx / some overloaded responses. | Same as other transient codes. |
@@ -82,7 +84,7 @@ This plugin does **not** invent a private retry loop. Chat uses official `dsh-ll
 
 A 429 is **not** automatically “busy”, and it is **not** automatically “out of money”. Official classification reads the provider text: quota wording becomes `QUOTA`, other 429s become `RATE_LIMIT`. Five-hour or weekly windows are only `QUOTA` when the provider said so in those words.
 
-The default budget is **two** automatic retries for the transient codes above. After that the turn ends. If Continue fails or the composer stays stuck, start a new chat.
+On RC8 the default budget is **five** automatic retries for the transient codes above. After that the turn ends. If Continue fails or the composer stays stuck, start a new chat.
 
 To raise the budget without editing plugin code, patch the `llm-oauth-login` row:
 
@@ -92,7 +94,7 @@ To raise the budget without editing plugin code, patch the `llm-oauth-login` row
   config:
     retryPolicy:
       mode: normal
-      maxRetries: 4
+      maxRetries: 7
       backoff:
         initialDelayMs: 1000
         maxDelayMs: 30000

@@ -10,5 +10,8 @@ export const PI_LOGIN_ROUTE_PREFIX = 'pi-'
 /** Provider idle ceiling used by every composite route. */
 export const PI_LOGIN_STREAM_IDLE_TIMEOUT_MS = 300_000
 
+/** RC8 request-level image payload ceiling; matches the official pi-ai default. */
+export const PI_LOGIN_MAX_REQUEST_IMAGE_BYTES = 20 * 1024 * 1024
+
 /** Startup line `dshx verify` looks for. */
 export const PI_LOGIN_BOOT_MARKER = '[my-plugins/dsh-oauth-login] loaded'

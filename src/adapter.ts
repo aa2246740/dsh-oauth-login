@@ -12,7 +12,10 @@ import { PI_LOGIN_PROVIDERS, piLoginProviderByRoute } from './catalog.ts'
 import { iterateInCapture } from './hosted-capture.ts'
 import type { HostedCapture } from './hosted-capture.ts'
 import { injectHostedImages, stripAssistantImages } from './hosted-images.ts'
-import { PI_LOGIN_STREAM_IDLE_TIMEOUT_MS } from './ids.ts'
+import {
+  PI_LOGIN_MAX_REQUEST_IMAGE_BYTES,
+  PI_LOGIN_STREAM_IDLE_TIMEOUT_MS,
+} from './ids.ts'
 import { hintFailure, withModelErrorHint } from './model-error-hint.ts'
 import type { PiLoginSession } from './session.ts'
 import { filterHostedServerToolTraces, nativePlanForRoute } from './native-tools.ts'
@@ -85,6 +88,7 @@ export function createPiLoginAdapter(
           provider: spec.route,
           displayName: spec.displayName,
           streamIdleTimeoutMs,
+          maxRequestImageBytes: PI_LOGIN_MAX_REQUEST_IMAGE_BYTES,
           retryPolicy,
           configuredMaxTokens: new Map(),
           piProvider: session.provider(spec.id),

@@ -54,6 +54,8 @@ Copilot / OpenRouter / Kimi 不动：没有一份能稳定挂上的 hosted tool�
 
 原生搜索仍算进该厂商的订阅 / tool 额度，不再要 Exa、Perplexity 或 DeepSeek Search。服务端搜索痕迹不会再当成 DSH 工具去跑。Grok 搜索 hop 产生的空 Think，以及正文开始之后才冒出来的英文旁白 Think，会从流里丢掉，避免钉在回复下面。托管出图会写入附件库，并显示在助手那一轮里。
 
+只有调用方明确传入 `tools` 列表时才会挂载 hosted tools。自动审批、标题生成等不带 `tools` 的辅助纯文本调用会保持纯文本，不会被塞入搜索或出图工具。
+
 若要继续用 DSH 自己的搜索：
 
 ```yaml
@@ -71,7 +73,7 @@ Copilot / OpenRouter / Kimi 不动：没有一份能稳定挂上的 hosted tool�
 
 | 码 | 通常是什么 | 怎么做 |
 |---|---|---|
-| `RATE_LIMIT` | 请求限流或高峰繁忙。很多 HTTP 429 落在这里。 | 等完默认两次自动重试，再发一条。 |
+| `RATE_LIMIT` | 请求限流或高峰繁忙。很多 HTTP 429 落在这里。 | 等完默认五次自动重试，再发一条。 |
 | `QUOTA` | 套餐、用量窗、余额 / credits。 | 再试也补不回来，去查厂商套餐。 |
 | `TIMEOUT` / `TRANSPORT` | 空闲断流或网络。 | 本轮结束后再发一条。 |
 | `SERVER` | 对端 5xx / 部分 overloaded。 | 和其他暂时故障一样。 |
@@ -79,7 +81,7 @@ Copilot / OpenRouter / Kimi 不动：没有一份能稳定挂上的 hosted tool�
 
 429 **不等于**繁忙，也 **不等于**没钱。官方按厂商原文分类：像额度用尽就标 `QUOTA`，其余 429 标 `RATE_LIMIT`。5 小时 / 周限额只有原文说得像 usage-limit / quota 时才会进 `QUOTA`。
 
-默认暂时故障自动重试 **两次**，然后本轮结束。Continue 失败或输入框卡住，请开新对话。
+RC8 默认对暂时故障自动重试 **五次**，然后本轮结束。Continue 失败或输入框卡住，请开新对话。
 
 要加大次数而不改插件代码，给 `llm-oauth-login` 行加配置：
 
@@ -89,7 +91,7 @@ Copilot / OpenRouter / Kimi 不动：没有一份能稳定挂上的 hosted tool�
   config:
     retryPolicy:
       mode: normal
-      maxRetries: 4
+      maxRetries: 7
       backoff:
         initialDelayMs: 1000
         maxDelayMs: 30000

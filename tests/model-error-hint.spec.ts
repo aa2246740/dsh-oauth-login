@@ -58,11 +58,11 @@ describe('withModelErrorHint', () => {
 })
 
 describe('provider retry policy defaults', () => {
-  it('keeps the official two-retry budget when config omits retryPolicy', () => {
+  it('keeps the RC8 official five-retry budget when config omits retryPolicy', () => {
     const policy = resolveRetryPolicy(undefined, 'dsh-oauth-login retryPolicy')
     expect(policy).toMatchObject({
       mode: 'normal',
-      maxRetries: 2,
+      maxRetries: 5,
     })
     if (policy.mode !== 'normal') throw new Error('expected normal policy')
     expect([...policy.retryableCodes]).toEqual([...TRANSIENT_MODEL_CODES])
@@ -71,9 +71,9 @@ describe('provider retry policy defaults', () => {
   it('accepts an empty plugin Config and a raised retry budget', () => {
     expect(Config({})).toMatchObject({ streamIdleTimeoutMs: 300_000 })
     expect(Config({
-      retryPolicy: { mode: 'normal', maxRetries: 4 },
+      retryPolicy: { mode: 'normal', maxRetries: 7 },
     })).toMatchObject({
-      retryPolicy: { mode: 'normal', maxRetries: 4 },
+      retryPolicy: { mode: 'normal', maxRetries: 7 },
     })
   })
 })
