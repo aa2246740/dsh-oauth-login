@@ -1,5 +1,7 @@
 # Install dsh-oauth-login
 
+[中文](INSTALL.zh.md). Product pages: [README.md](README.md) (中文), [README.en.md](README.en.md).
+
 Clone the public repository, then add the folder as a `file:` package.
 
 ```sh

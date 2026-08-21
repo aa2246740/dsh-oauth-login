@@ -56,9 +56,11 @@
     "INSTALL.md",
     "INSTALL.zh.md",
     "README.md",
+    "README.en.md",
     "README.zh.md",
     "SECURITY.md",
-    "LICENSE"
+    "LICENSE",
+    "docs/screenshots"
   ],
   "license": "Apache-2.0",
   "dependencies": {
