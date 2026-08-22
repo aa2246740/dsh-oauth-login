@@ -1,5 +1,7 @@
 # 安装 dsh-oauth-login
 
+[English](INSTALL.md)。说明和截图在 [README.md](README.md)，英文在 [README.en.md](README.en.md)。
+
 克隆公开仓库，再按 `file:` 包安装。
 
 ```sh
