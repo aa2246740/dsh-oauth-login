@@ -1,4 +1,4 @@
-/** User-facing copy for classified model failures this plugin owns. */
+/** Provider-specific failure compatibility and user-facing model error copy. */
 
 import { LlmError } from '@deepseek-ai/dsh-llm'
 import type { LlmFailure } from '@deepseek-ai/dsh-llm'
@@ -37,21 +37,50 @@ function alreadyHinted(message: string): boolean {
   return SENTINELS.some(marker => message.includes(marker))
 }
 
-export function hintFailure(failure: LlmFailure): LlmFailure {
-  const hint = hintForCode(failure.code)
-  if (hint === undefined || alreadyHinted(failure.message)) return failure
+/** Read only the top-level Zhipu error code, never incidental request or message text. */
+function isZhipuPlanQuota(message: string): boolean {
+  const match = /^\s*429\s*:\s*(\{[\s\S]*\})\s*$/.exec(message)
+  if (match === null) return false
+  let payload: unknown
+  try {
+    payload = JSON.parse(match[1]!)
+  } catch (_malformedProviderJson) {
+    return false
+  }
+  return typeof payload === 'object' && payload !== null && !Array.isArray(payload)
+    && 'code' in payload && (payload.code === '1310' || payload.code === 1310)
+}
+
+/** Repair only observed route-specific classification gaps; keep all other official codes. */
+function providerFailure(failure: LlmFailure, provider: string | undefined): LlmFailure {
+  if (provider === 'pi-openai-codex' && failure.code === 'PI_AI_ERROR'
+    && /\b(?:servers?|engine)\s+(?:are|is)\s+(?:currently\s+)?overloaded\b/i.test(failure.message)) {
+    return { ...failure, code: 'SERVER' }
+  }
+  if (provider === 'pi-zai-coding-cn' && failure.code === 'RATE_LIMIT'
+    && isZhipuPlanQuota(failure.message)) {
+    return { ...failure, code: 'QUOTA' }
+  }
+  return failure
+}
+
+/** Normalize known provider gaps before the official retry executor receives this failure. */
+export function hintFailure(failure: LlmFailure, provider?: string): LlmFailure {
+  const normalized = providerFailure(failure, provider)
+  const hint = hintForCode(normalized.code)
+  if (hint === undefined || alreadyHinted(normalized.message)) return normalized
   return {
-    ...failure,
-    message: `${failure.message} ${hint}`,
+    ...normalized,
+    message: `${normalized.message} ${hint}`,
   }
 }
 
-/** Append a code-specific hint without changing the routable `code`. */
-export function withModelErrorHint(error: unknown): unknown {
+/** Apply the same provider correction and hint to thrown failures, preserving diagnostics. */
+export function withModelErrorHint(error: unknown, provider?: string): unknown {
   if (!(error instanceof LlmError)) return error
-  const hinted = hintFailure(error.failure)
+  const hinted = hintFailure(error.failure, provider)
   if (hinted === error.failure) return error
-  return new LlmError(hinted.message, error.code, {
+  return new LlmError(hinted.message, hinted.code, {
     cause: error,
     ...error.failure.status === undefined ? {} : { status: error.failure.status },
     ...error.failure.providerRetryAfterMs === undefined

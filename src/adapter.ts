@@ -5,6 +5,7 @@ import { defaultProviderAuthContext } from '@earendil-works/pi-ai'
 import type {
   GenerateOptions,
   LlmResolvedModelInfo,
+  PreparedAdapterCall,
   RetryPolicyConfig,
   StreamChunk,
 } from '@deepseek-ai/dsh-llm'
@@ -35,10 +36,25 @@ export interface PiLoginAdapterOptions {
   retryPolicy?: RetryPolicyConfig
 }
 
+/** Keep provider failures routable for both direct and snapshot-prepared requests. */
+async function* withFailureHints(source: AsyncIterable<StreamChunk>, provider: string): AsyncIterable<StreamChunk> {
+  try {
+    for await (const chunk of source) {
+      if (chunk.type === 'finish' && chunk.reason.kind === 'error') {
+        yield { ...chunk, reason: { ...chunk.reason, failure: hintFailure(chunk.reason.failure, provider) } }
+      } else {
+        yield chunk
+      }
+    }
+  } catch (error: unknown) {
+    throw withModelErrorHint(error, provider)
+  }
+}
+
 /**
- * Official Pi adapter plus Chat copy. `dsh-llm-retry` still owns the attempt
- * budget and routes on `code`. Provider 429/quota usually arrive as finish
- * chunks, not thrown errors, so both paths get the same hint.
+ * Official Pi adapter plus bounded provider compatibility and Chat copy.
+ * `dsh-llm-retry` owns the attempt budget and routes on `code`. Finish chunks
+ * and thrown errors receive the same route-specific correction and hint.
  */
 class PiLoginAdapter extends PiAiAdapter {
   constructor(
@@ -73,6 +89,14 @@ class PiLoginAdapter extends PiAiAdapter {
       ?? defaultReasoningEffortFor(model)
   }
 
+  override async prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedAdapterCall> {
+    const prepared = await super.prepareCall(provider, model, signal)
+    return {
+      ...prepared,
+      stream: options => withFailureHints(prepared.stream(options), provider),
+    }
+  }
+
   override async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     const capture: HostedCapture = { images: [] }
     const defaultEffort = this.defaultEffort(options.provider, options.model)
@@ -91,21 +115,9 @@ class PiLoginAdapter extends PiAiAdapter {
       const source = attachments === undefined
         ? filtered
         : injectHostedImages(filtered, capture, input => attachments.saveImage(input))
-      for await (const chunk of source) {
-        if (chunk.type === 'finish' && chunk.reason.kind === 'error') {
-          yield {
-            ...chunk,
-            reason: {
-              ...chunk.reason,
-              failure: hintFailure(chunk.reason.failure),
-            },
-          }
-          continue
-        }
-        yield chunk
-      }
+      yield* withFailureHints(source, sanitized.provider)
     } catch (error: unknown) {
-      throw withModelErrorHint(error)
+      throw withModelErrorHint(error, sanitized.provider)
     }
   }
 }

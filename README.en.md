@@ -148,7 +148,9 @@ To keep DSH's own search tool:
 
 ## When the model fails
 
-This plugin does not invent a private retry loop. Chat uses official `dsh-llm-retry` and official `LlmError` codes. The plugin only appends a short hint and keeps the code.
+This plugin uses official `dsh-llm-retry` budgets, backoff, and cancellation. Before appending a hint, it repairs two confirmed classification gaps: server-overloaded text on the Codex route changes from `PI_AI_ERROR` to `SERVER`, and HTTP 429 with business code `1310` on the Zhipu China Coding Plan route changes from `RATE_LIMIT` to `QUOTA`. Terminal stream failures and thrown errors use the same rules. Other routes and already classified errors retain their codes.
+
+Agent requests use `prepareCall` to capture model and provider state; direct streaming consumers use `stream`. Both paths apply the compatibility rules. Prepared requests retain the original `prepared.stream` rather than reselecting the provider or losing the captured request state.
 
 | Code | What it usually is | What to do |
 |---|---|---|
@@ -158,7 +160,7 @@ This plugin does not invent a private retry loop. Chat uses official `dsh-llm-re
 | `SERVER` | Provider 5xx / some overloaded responses. | Same as other transient codes. |
 | `AUTH` / `MISSING_CREDENTIAL` | Grant or Plan key missing or rejected. | Settings → Subscription Login. Chat may show AUTH as "API key is invalid". |
 
-A 429 is not automatically "busy", and it is not automatically "out of money". Official classification reads the provider text: quota wording becomes `QUOTA`, other 429s become `RATE_LIMIT`. Five-hour or weekly windows are only `QUOTA` when the provider said so in those words.
+A 429 does not by itself distinguish peak traffic from depleted quota. Zhipu code `1305` remains retryable `RATE_LIMIT`; code `1310` becomes `QUOTA`, stopping short automatic retries and showing the quota hint. This compatibility rule only reads the top-level business code in that route's error JSON, never request examples, nested fields, or ambiguous text.
 
 On RC8 the default budget is five automatic retries for the transient codes above. After that the turn ends. If Continue fails or the composer stays stuck, start a new chat.
 

@@ -141,7 +141,9 @@ Hosted tools 是这一次请求的能力。只有调用方带了 `tools` 列表�
 
 ## 模型失败时
 
-插件不另写一套重试。Chat 用官方 `dsh-llm-retry` 和官方 `LlmError` 码。插件只在原文后面补一句说明，不改 code。
+插件不另写一套重试。Chat 使用官方 `dsh-llm-retry` 的次数、退避和取消机制。插件在追加说明前兼容两个已确认的分类缺口：Codex 路由的服务器 overloaded 文案从 `PI_AI_ERROR` 修正为 `SERVER`，智谱国内 Coding Plan 路由的 HTTP 429 / 业务码 `1310` 从 `RATE_LIMIT` 修正为 `QUOTA`。流内错误和抛出的错误使用同一规则，其他路由与已明确分类的错误保持原样。
+
+正常 Agent 请求使用 `prepareCall` 固定模型与提供方状态，直接流式调用使用 `stream`。两个入口均应用上述错误兼容；已准备请求继续使用原始 `prepared.stream`，不会为了补重试而重新选择提供方或丢失请求快照。
 
 | 码 | 通常是什么 | 怎么做 |
 |---|---|---|
@@ -151,7 +153,7 @@ Hosted tools 是这一次请求的能力。只有调用方带了 `tools` 列表�
 | `SERVER` | 对端 5xx / 部分 overloaded。 | 和其他暂时故障一样。 |
 | `AUTH` / `MISSING_CREDENTIAL` | 没登录、没有 Plan Key 或凭据被拒。 | 设置 → 订阅登录。Chat 有时把 AUTH 显示成 “API key is invalid”。 |
 
-429 不等于繁忙，也不等于没钱。官方按厂商原文分类：像额度用尽就标 `QUOTA`，其余 429 标 `RATE_LIMIT`。5 小时 / 周限额只有原文说得像 usage-limit / quota 时才会进 `QUOTA`。
+429 不等于繁忙，也不等于额度耗尽。智谱 `1305` 高峰繁忙仍按 `RATE_LIMIT` 自动重试；`1310` 周/月额度耗尽按 `QUOTA` 停止短间隔自动重试并显示额度提示。插件只读取该路由错误 JSON 的顶层业务码，不按请求示例、嵌套字段或含糊文案猜测额度状态。
 
 RC8 默认对暂时故障自动重试五次，然后本轮结束。Continue 失败或输入框卡住，开新对话。
 

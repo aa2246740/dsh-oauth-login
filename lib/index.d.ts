@@ -380,9 +380,10 @@ declare const RATE_LIMIT_HINT = "This is a request-rate or peak-busy limit. A 42
 declare const TRANSIENT_HINT = "After this turn ends, send another message to try again. If Continue fails or the composer stays stuck, start a new chat.";
 /** Stable Chat copy for one official `LlmError` code. Does not invent 5h vs weekly vs billing. */
 declare function hintForCode(code: string): string | undefined;
-declare function hintFailure(failure: LlmFailure): LlmFailure;
-/** Append a code-specific hint without changing the routable `code`. */
-declare function withModelErrorHint(error: unknown): unknown;
+/** Normalize known provider gaps before the official retry executor receives this failure. */
+declare function hintFailure(failure: LlmFailure, provider?: string): LlmFailure;
+/** Apply the same provider correction and hint to thrown failures, preserving diagnostics. */
+declare function withModelErrorHint(error: unknown, provider?: string): unknown;
 //#endregion
 //#region src/provider.d.ts
 declare function catalogProvider(id: string): Provider;
