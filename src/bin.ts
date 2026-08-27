@@ -82,7 +82,7 @@ function printHelp(): void {
   process.stdout.write([
     'Usage: dsh-oauth-login <login|logout|status> [provider]',
     '',
-    '  login [provider]   Pi-native OAuth. Own file, not official CLIs',
+    '  login [provider]   Subscription OAuth or official Plan API key',
     '  logout [provider]  remove a dsh credential (or all if omitted)',
     '  status [provider]  report non-secret credential state',
     '',
@@ -154,6 +154,11 @@ export async function run(argv: readonly string[]): Promise<number> {
           return 1
         }
         const id = requirePiLoginProvider(rawProvider).id
+        const spec = requirePiLoginProvider(id)
+        if (spec.authType === 'api_key' && spec.loginUrl !== undefined) {
+          process.stdout.write(`Create or copy the Plan API key here:\n${spec.loginUrl}\n`)
+          openBrowser(spec.loginUrl, id)
+        }
         const readline = createInterface({ input: process.stdin, output: process.stdout })
         try {
           await loginPiProviderSession(id, {

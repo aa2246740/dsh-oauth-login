@@ -48,4 +48,26 @@ describe('authenticated harness routes', () => {
     }))
     expect(session.visibleModels('xai').map(model => model.id)).toContain('grok-4.6')
   })
+
+  it('still exposes stealth/ox-alpha once OpenRouter is signed in', async () => {
+    const session = await tempSession()
+    await session.store.modify('openrouter', async () => ({
+      type: 'oauth',
+      access: 'openrouter-access',
+      refresh: '',
+      expires: 1_700_000_000_000,
+    }))
+    expect(session.visibleModels('openrouter').map(model => model.id)).toContain('stealth/ox-alpha')
+  })
+
+  it('publishes the Zhipu route for a stored Plan API key', async () => {
+    const session = await tempSession()
+    await session.store.modify('zai-coding-cn', async () => ({
+      type: 'api_key',
+      key: 'test-zhipu-plan-key',
+    }))
+    expect(await session.authenticatedRoutes()).toEqual(['pi-zai-coding-cn'])
+    expect(session.visibleModels('zai-coding-cn').map(model => model.id)).toContain('glm-5.3-flash')
+    expect(session.visibleModels('zai-coding-cn').map(model => model.id)).toContain('glm-5.2')
+  })
 })

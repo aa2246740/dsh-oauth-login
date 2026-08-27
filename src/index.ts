@@ -1,5 +1,5 @@
 /**
- * DSH-owned multi-provider OAuth for DeepSeek Harness.
+ * DSH-owned multi-provider subscription login for DeepSeek Harness.
  * Independent store. Never touches Pi Agent or official CLI auth files.
  */
 
@@ -46,14 +46,24 @@ export {
 export type { PiLoginAuthStatus } from './auth.ts'
 export {
   registerPiLoginAuthRoutes,
+  PI_LOGIN_AUTH_COMPLETE_PATH,
   PI_LOGIN_AUTH_LOGIN_PATH,
   PI_LOGIN_AUTH_LOGOUT_PATH,
   PI_LOGIN_AUTH_STATUS_PATH,
 } from './auth-routes.ts'
-export type { LoginChallenge, PiLoginProviderStatus } from './auth-routes.ts'
+export type {
+  LoginChallenge,
+  LoginInputChallenge,
+  PiLoginProviderStatus,
+} from './auth-routes.ts'
 export { PI_LOGIN_PROVIDERS, piLoginProvider, piLoginRoutes } from './catalog.ts'
 export type { PiLoginProvider } from './catalog.ts'
-export { extraModelsFor } from './extra-models.ts'
+export {
+  defaultReasoningEffortFor,
+  extraModelsFor,
+  OX_ALPHA_DEFAULT_EFFORT,
+  OX_ALPHA_MODEL_ID,
+} from './extra-models.ts'
 export {
   applyNativeToolsToPayload,
   DEFAULT_NATIVE_TOOL_POLICY,
@@ -106,7 +116,7 @@ export const name = 'llm-oauth-login'
 export const inject = ['llm']
 
 /**
- * Publish only the routes that currently hold an OAuth grant.
+ * Publish only the routes that currently hold a plugin-owned credential.
  * Logging out must drop that route from the model picker immediately.
  */
 async function syncAuthenticatedRoutes(
@@ -134,10 +144,22 @@ export function apply(ctx: Context, config: Config): void {
   const refreshRoutes = (): Promise<void> => syncAuthenticatedRoutes(session, registration)
   void refreshRoutes()
   ctx.effect(() => {
+    const stop = session.openRouter.subscribe(() => {
+      void refreshRoutes().catch(() => { /* The next directory load retries. */ })
+    })
+    void session.openRouter.syncAuthentication().catch(() => {
+      console.warn('[dsh-oauth-login] OpenRouter catalog initialization failed; keeping built-in models')
+    })
+    return () => {
+      stop()
+      session.openRouter.dispose()
+    }
+  }, 'dsh-oauth-login: OpenRouter catalog')
+  ctx.effect(() => {
     const timer = setInterval(() => {
-      void session.refreshStoredGrants()
+      void session.refreshStoredGrants().catch(() => { /* Next auth poll retries. */ })
     }, OAUTH_REFRESH_POLL_MS)
-    void session.refreshStoredGrants()
+    void session.refreshStoredGrants().catch(() => { /* Next auth poll retries. */ })
     return () => clearInterval(timer)
   }, 'dsh-oauth-login: refresh oauth grants')
   ctx.inject(['webServer'], webCtx => {

@@ -2,13 +2,13 @@
 
 [中文](README.md) | English
 
-Sign ChatGPT, Claude, Grok, Copilot, OpenRouter, and Kimi into [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). The adapters are the same ones Pi Agent uses for `/login`. The grant is written only to DSH's own `$DSH_HOME/.dsh-oauth-auth.json`.
+Connect ChatGPT, Claude, Grok, Copilot, OpenRouter, Kimi, and Zhipu GLM Coding Plan to [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). The plugin reuses Pi Agent's provider adapters. Credentials are written only to DSH's own `$DSH_HOME/.dsh-oauth-auth.json`.
 
-Use this if you already pay for a provider subscription and do not want to paste an API key into Harness. Official `codex login`, Claude Code, the `grok` CLI, and Pi Agent's `~/.pi/agent/auth.json` are never read or written.
+Use the provider's OAuth flow where available; Zhipu uses its official Coding Plan API key. Official `codex login`, Claude Code, the `grok` CLI, and Pi Agent's `~/.pi/agent/auth.json` are never read or written.
 
 ## What it looks like
 
-These shots are from this repo installed into `dsh web`, then **Settings → OAuth Login**. Not mockups.
+These real screenshots are retained from an earlier OAuth-only version installed into `dsh web`. In 0.2.0 the entry is **Settings → Subscription Login**, with added Zhipu Plan support and OpenRouter model sync. The older screenshots do not show those new features.
 
 Harness was in Chinese on the machine that took them. The plugin copy follows the Harness language setting.
 
@@ -45,11 +45,12 @@ dsh plugin --profile web add file:./dsh-oauth-login
 
 A bare `./dsh-oauth-login` is installed as a symlink. This plugin treats the Harness runtime as peer dependencies, so the copied `file:` install is what lets Node resolve them from the profile.
 
-Restart `dsh web`. Open **Settings → OAuth Login**. Pick a `pi-…` route in the composer.
+Restart `dsh web`. Open **Settings → Subscription Login**. Pick a `pi-…` route in the composer.
 
 ```sh
 dsh plugin --profile web exec dsh-oauth-login login openai-codex
 dsh plugin --profile web exec dsh-oauth-login login xai
+dsh plugin --profile web exec dsh-oauth-login login zai-coding-cn
 dsh plugin --profile web exec dsh-oauth-login status
 ```
 
@@ -57,20 +58,60 @@ Existing DSH installs migrate the old `.pi-login-auth.json` name on the next wri
 
 ## Providers
 
-| Settings card | Harness route | Pi provider |
-|---|---|---|
-| ChatGPT Codex | `pi-openai-codex` | `openai-codex` |
-| Claude Pro/Max | `pi-anthropic` | `anthropic` |
-| xAI Grok | `pi-xai` | `xai` |
-| GitHub Copilot | `pi-github-copilot` | `github-copilot` |
-| OpenRouter | `pi-openrouter` | `openrouter` |
-| Kimi For Coding | `pi-kimi-coding` | `kimi-coding` |
+| Settings card | Harness route | Pi provider | Credential |
+|---|---|---|---|
+| ChatGPT Codex | `pi-openai-codex` | `openai-codex` | OAuth |
+| Claude Pro/Max | `pi-anthropic` | `anthropic` | OAuth |
+| xAI Grok | `pi-xai` | `xai` | OAuth |
+| GitHub Copilot | `pi-github-copilot` | `github-copilot` | OAuth |
+| OpenRouter | `pi-openrouter` | `openrouter` | OAuth |
+| Kimi For Coding | `pi-kimi-coding` | `kimi-coding` | OAuth |
+| Zhipu GLM Coding Plan | `pi-zai-coding-cn` | `zai-coding-cn` | Plan API key |
 
 Radius is omitted. It needs a custom gateway.
 
-## Where the grant lives
+## OpenRouter model sync and free filter
 
-Credentials go only in `$DSH_HOME/.dsh-oauth-auth.json`, owner-only. Do not paste that file, callback URLs, authorization codes, or tokens into a public issue. Private reporting is in [SECURITY.md](SECURITY.md).
+OAuth sign-in refreshes the official model catalog immediately. While signed
+in, the DSH server refreshes it every **15 minutes**. Startup shows the local
+cache first and refreshes stale data. Use **Refresh models** in the model menu
+or **Settings → Subscription Login → OpenRouter** for a manual refresh, with
+a shared 60-second cooldown.
+
+The model menu has **All / Free only**, a price-based **Free · limited** badge,
+tool capability, context size and the last sync time. Failed refreshes retain
+the last-good list and mark it as cached. New models enter the real adapter;
+background refreshes never change the selected model.
+
+Free models still have OpenRouter rate/daily limits and provider capacity
+limits. Free requests set zero price caps and disable paid model fallbacks
+and known paid plugins. A previously free model becoming paid or disappearing
+does not silently opt into paid inference. Account/organization-enforced paid
+plugins cannot be overridden by DSH: disable those enforced rules in OpenRouter.
+
+The credential-free catalog is stored separately at
+`$DSH_HOME/.dsh-oauth-openrouter-models.json`. See the
+[sync contract](docs/openrouter-sync.md) for details and verification boundaries.
+
+## Zhipu GLM Coding Plan
+
+Zhipu’s published Coding Plan integration uses a dedicated Plan API key, not a
+public third-party browser OAuth flow. Click **Connect Plan** on the Zhipu card:
+the plugin opens the official
+[Coding Plan overview](https://bigmodel.cn/coding-plan/personal/overview), then
+asks you to paste the key into the local DSH page. The official endpoint is
+`https://open.bigmodel.cn/api/coding/paas/v4`.
+
+The plugin does not read BigModel cookies, browser storage, page content, or
+keys from another application. It sends the saved key only through Pi’s
+`zai-coding-cn` adapter when you select the `pi-zai-coding-cn` route.
+The route defaults to `glm-5.3-flash` and also keeps the older Coding Plan
+models visible. The plugin supplies GLM-5.3-Flash metadata until the installed
+Pi catalog includes it.
+
+## Where credentials live
+
+OAuth grants and Plan API keys go only in `$DSH_HOME/.dsh-oauth-auth.json`, owner-only. Do not paste that file, API keys, callback URLs, authorization codes, or tokens into a public issue. Private reporting is in [SECURITY.md](SECURITY.md).
 
 ## Hosted search and images
 
@@ -84,7 +125,7 @@ On these routes the plugin removes DSH `web_search` / `web_fetch` from the model
 | `pi-openai-codex` | `web_search`, `image_generation` |
 | `pi-anthropic` | `web_search_20250305` |
 
-Copilot, OpenRouter, and Kimi are left alone. They have no single hosted tool this plugin can attach. DeepSeek official chat is unchanged.
+No hosted tools are attached for Copilot, OpenRouter, Kimi, or Zhipu. OpenRouter free requests have separate zero-price and paid-plugin guards described above. DeepSeek official chat is unchanged.
 
 Hosted search bills the OAuth subscription / tool quota of that provider. It does not need Exa, Perplexity, or DeepSeek Search. Server-side search traces are not executed as DSH tools. Empty Grok Think cards from hosted search hops are dropped. Reasoning that starts after the visible reply is also dropped. Hosted images are saved through the attachment store and shown in the assistant turn.
 
@@ -111,7 +152,7 @@ This plugin does not invent a private retry loop. Chat uses official `dsh-llm-re
 | `QUOTA` | Plan, usage window, or balance. | Retry will not refill it. Check the provider plan. |
 | `TIMEOUT` / `TRANSPORT` | Idle stream or network. | Send another message after the turn ends. |
 | `SERVER` | Provider 5xx / some overloaded responses. | Same as other transient codes. |
-| `AUTH` / `MISSING_CREDENTIAL` | Grant missing or rejected. | Settings → OAuth Login. Chat may show AUTH as "API key is invalid". |
+| `AUTH` / `MISSING_CREDENTIAL` | Grant or Plan key missing or rejected. | Settings → Subscription Login. Chat may show AUTH as "API key is invalid". |
 
 A 429 is not automatically "busy", and it is not automatically "out of money". Official classification reads the provider text: quota wording becomes `QUOTA`, other 429s become `RATE_LIMIT`. Five-hour or weekly windows are only `QUOTA` when the provider said so in those words.
 

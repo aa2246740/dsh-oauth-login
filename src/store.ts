@@ -1,25 +1,26 @@
 /**
- * Multi-provider OAuth store. File is $DSH_HOME/.dsh-oauth-auth.json.
+ * Multi-provider subscription credential store. File is $DSH_HOME/.dsh-oauth-auth.json.
  * The old .pi-login-auth.json name is read only as a DSH-owned migration source.
  * Never ~/.codex, ~/.grok, ~/.claude, or ~/.pi/agent/auth.json.
  */
 
 import { mkdir, readFile, rm, stat } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
-import type { Credential, CredentialInfo, CredentialStore, OAuthCredential } from '@earendil-works/pi-ai'
+import type { Credential, CredentialInfo, CredentialStore, ProviderEnv } from '@earendil-works/pi-ai'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { PI_LOGIN_PROVIDERS } from './catalog.ts'
 import { LEGACY_PI_LOGIN_AUTH_FILENAME, PI_LOGIN_AUTH_FILENAME } from './ids.ts'
 
 const AUTH_FORMAT_VERSION = 1
-const ALLOWED_FIELDS = new Set([
+const OAUTH_ALLOWED_FIELDS = new Set([
   'type', 'access', 'refresh', 'expires', 'accountId', 'enterpriseUrl', 'availableModelIds',
 ])
+const API_KEY_ALLOWED_FIELDS = new Set(['type', 'key', 'env'])
 
 interface AuthDocument {
   version: typeof AUTH_FORMAT_VERSION
-  credentials: Record<string, OAuthCredential>
+  credentials: Record<string, Credential>
 }
 
 function isENOENT(error: unknown): boolean {
@@ -43,16 +44,48 @@ async function assertOwnerOnly(filename: string): Promise<void> {
   }
 }
 
-function parseCredential(raw: unknown, filename: string, providerId: string): OAuthCredential {
+function parseProviderEnv(raw: unknown, filename: string, providerId: string): ProviderEnv | undefined {
+  if (raw === undefined) return undefined
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
+    throw new Error(`pi-login: ${filename} credential for ${providerId} env must be an object`)
+  }
+  const env: ProviderEnv = {}
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof value !== 'string') {
+      throw new Error(`pi-login: ${filename} credential for ${providerId} env values must be strings`)
+    }
+    env[key] = value
+  }
+  return env
+}
+
+function parseCredential(raw: unknown, filename: string, providerId: string): Credential {
   if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) {
     throw new Error(`pi-login: ${filename} credential for ${providerId} must be an object`)
   }
   const credential = raw as Record<string, unknown>
-  if (Object.keys(credential).some(key => !ALLOWED_FIELDS.has(key))) {
+  const type = credential['type']
+  const allowed = type === 'oauth'
+    ? OAUTH_ALLOWED_FIELDS
+    : type === 'api_key'
+      ? API_KEY_ALLOWED_FIELDS
+      : undefined
+  if (allowed === undefined) {
+    throw new Error(`pi-login: ${filename} credential for ${providerId} type must be oauth or api_key`)
+  }
+  if (Object.keys(credential).some(key => !allowed.has(key))) {
     throw new Error(`pi-login: ${filename} credential for ${providerId} contains an unknown field`)
   }
-  if (credential['type'] !== 'oauth') {
-    throw new Error(`pi-login: ${filename} credential for ${providerId} type must be oauth`)
+  if (type === 'api_key') {
+    if (typeof credential['key'] !== 'string' || credential['key'].length === 0) {
+      throw new Error(`pi-login: ${filename} credential for ${providerId} key must be a non-empty string`)
+    }
+    const env = parseProviderEnv(credential['env'], filename, providerId)
+    return {
+      type: 'api_key',
+      key: credential['key'],
+      ...(env === undefined ? {} : { env }),
+    }
   }
   if (typeof credential['access'] !== 'string' || credential['access'].length === 0) {
     throw new Error(`pi-login: ${filename} credential for ${providerId} access must be a non-empty string`)
@@ -63,7 +96,7 @@ function parseCredential(raw: unknown, filename: string, providerId: string): OA
   if (typeof credential['expires'] !== 'number' || !Number.isFinite(credential['expires']) || credential['expires'] <= 0) {
     throw new Error(`pi-login: ${filename} credential for ${providerId} expires must be a positive finite number`)
   }
-  return credential as unknown as OAuthCredential
+  return credential as unknown as Credential
 }
 
 function parseDocument(text: string, filename: string): AuthDocument {
@@ -88,7 +121,7 @@ function parseDocument(text: string, filename: string): AuthDocument {
     throw new Error(`pi-login: ${filename} credentials must be an object`)
   }
   const owned = new Set(PI_LOGIN_PROVIDERS.map(provider => provider.id))
-  const credentials: Record<string, OAuthCredential> = {}
+  const credentials: Record<string, Credential> = {}
   for (const [providerId, entry] of Object.entries(raw as Record<string, unknown>)) {
     if (!owned.has(providerId)) {
       throw new Error(`pi-login: ${filename} contains an unknown provider "${providerId}"`)
@@ -98,7 +131,7 @@ function parseDocument(text: string, filename: string): AuthDocument {
   return { version: AUTH_FORMAT_VERSION, credentials }
 }
 
-function cloneCredential(credential: OAuthCredential): OAuthCredential {
+function cloneCredential(credential: Credential): Credential {
   return structuredClone(credential)
 }
 
@@ -137,9 +170,9 @@ export class PiLoginCredentialStore implements CredentialStore {
   }
 
   async list(): Promise<readonly CredentialInfo[]> {
-    return Object.keys((await this.readDocument()).credentials).map(providerId => ({
+    return Object.entries((await this.readDocument()).credentials).map(([providerId, credential]) => ({
       providerId,
-      type: 'oauth' as const,
+      type: credential.type,
     }))
   }
 

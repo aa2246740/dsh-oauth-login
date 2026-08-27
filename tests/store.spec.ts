@@ -45,6 +45,20 @@ describe('PiLoginCredentialStore', () => {
     expect(openrouter?.type === 'oauth' && openrouter.refresh).toBe('')
   })
 
+  it('round-trips a Zhipu Plan API key without exposing it from list()', async () => {
+    const store = await tempStore()
+    await store.modify('zai-coding-cn', async () => ({
+      type: 'api_key',
+      key: 'test-zhipu-plan-key',
+    }))
+
+    const credential = await store.read('zai-coding-cn')
+    expect(credential?.type === 'api_key' && credential.key).toBe('test-zhipu-plan-key')
+    expect(await store.list()).toEqual([
+      { providerId: 'zai-coding-cn', type: 'api_key' },
+    ])
+  })
+
   it('reads the legacy DSH filename and writes the new DSH filename', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'dsh-oauth-'))
     const store = new PiLoginCredentialStore(join(dir, '.dsh-oauth-auth.json'))

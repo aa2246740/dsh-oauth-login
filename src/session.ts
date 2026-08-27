@@ -1,5 +1,6 @@
 /** Shared OAuth store + catalog for the host plugin and CLI. */
 
+import { dirname, join } from 'node:path'
 import { createModels } from '@earendil-works/pi-ai'
 import type { MutableModels } from '@earendil-works/pi-ai'
 import { PI_LOGIN_PROVIDERS, piLoginProvider } from './catalog.ts'
@@ -15,23 +16,36 @@ import {
 } from './oauth-refresh.ts'
 import { DEFAULT_NATIVE_TOOL_POLICY } from './native-tools.ts'
 import type { NativeToolPolicy } from './native-tools.ts'
-import { allCatalogProviders, harnessProvider } from './provider.ts'
+import { allCatalogProviders, harnessModels, harnessProvider } from './provider.ts'
 import { PiLoginCredentialStore } from './store.ts'
+import { OPENROUTER_CACHE_FILENAME, OpenRouterCatalog } from './openrouter-catalog.ts'
+import type { OpenRouterCatalogOptions } from './openrouter-catalog.ts'
 
 export class PiLoginSession {
   readonly store: PiLoginCredentialStore
   readonly models: MutableModels
   readonly native: NativeToolPolicy
+  readonly openRouter: OpenRouterCatalog
   private transportPromise?: Promise<OAuthProxyResolution>
 
   constructor(
     store: PiLoginCredentialStore = new PiLoginCredentialStore(),
     native: NativeToolPolicy = DEFAULT_NATIVE_TOOL_POLICY,
+    catalogOptions: Partial<Pick<OpenRouterCatalogOptions, 'fetch' | 'now' | 'filename'>> = {},
   ) {
     this.store = store
     this.native = native
     this.models = createModels({ credentials: store })
     for (const provider of allCatalogProviders()) this.models.setProvider(provider)
+    this.openRouter = new OpenRouterCatalog({
+      filename: join(dirname(store.filename), OPENROUTER_CACHE_FILENAME),
+      isAuthenticated: async () => (await store.list()).some(item => item.providerId === 'openrouter'),
+      beforeFetch: () => this.ensureTransport(),
+      initiallyProtectedIds: harnessModels(this.spec('openrouter'))
+        .filter(model => model.cost.input === 0 && model.cost.output === 0)
+        .map(model => model.id),
+      ...catalogOptions,
+    })
   }
 
   ensureTransport(): Promise<OAuthProxyResolution> {
@@ -52,7 +66,7 @@ export class PiLoginSession {
   }
 
   provider(id: string) {
-    return harnessProvider(this.spec(id), this.native)
+    return harnessProvider(this.spec(id), this.native, this.openRouter)
   }
 
   visibleModels(id: string) {
@@ -72,6 +86,7 @@ export class PiLoginSession {
 
   async logout(id: string): Promise<void> {
     await this.store.delete(id)
+    if (id === 'openrouter') this.openRouter.disconnect()
   }
 
   /**

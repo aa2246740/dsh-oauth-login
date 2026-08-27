@@ -5,6 +5,10 @@ export interface PiLoginProvider {
   readonly id: string
   /** Harness LLM route. Distinct from catalog routes and from other plugins. */
   readonly route: string
+  /** Credential method this plugin deliberately exposes for this provider. */
+  readonly authType: 'oauth' | 'api_key'
+  /** Official account page opened before an interactive API-key prompt. */
+  readonly loginUrl?: string
   readonly displayName: string
   readonly shortName: string
   readonly blurb: string
@@ -20,6 +24,7 @@ export const PI_LOGIN_PROVIDERS: readonly PiLoginProvider[] = [
   {
     id: 'openai-codex',
     route: 'pi-openai-codex',
+    authType: 'oauth',
     displayName: 'ChatGPT Codex',
     shortName: 'Codex',
     blurb: 'ChatGPT Plus/Pro Codex. Independent of official `codex login`.',
@@ -31,6 +36,7 @@ export const PI_LOGIN_PROVIDERS: readonly PiLoginProvider[] = [
   {
     id: 'anthropic',
     route: 'pi-anthropic',
+    authType: 'oauth',
     displayName: 'Claude Pro/Max',
     shortName: 'Claude',
     blurb: 'Claude subscription. Independent of official Claude Code login.',
@@ -42,6 +48,7 @@ export const PI_LOGIN_PROVIDERS: readonly PiLoginProvider[] = [
   {
     id: 'xai',
     route: 'pi-xai',
+    authType: 'oauth',
     displayName: 'xAI Grok',
     shortName: 'Grok',
     blurb: 'SuperGrok / X Premium. Independent of official `grok` CLI.',
@@ -53,6 +60,7 @@ export const PI_LOGIN_PROVIDERS: readonly PiLoginProvider[] = [
   {
     id: 'github-copilot',
     route: 'pi-github-copilot',
+    authType: 'oauth',
     displayName: 'GitHub Copilot',
     shortName: 'Copilot',
     blurb: 'GitHub Copilot subscription via device code.',
@@ -64,6 +72,7 @@ export const PI_LOGIN_PROVIDERS: readonly PiLoginProvider[] = [
   {
     id: 'openrouter',
     route: 'pi-openrouter',
+    authType: 'oauth',
     displayName: 'OpenRouter',
     shortName: 'OpenRouter',
     blurb: 'OpenRouter OAuth mints a key billed from your OpenRouter credits.',
@@ -75,6 +84,7 @@ export const PI_LOGIN_PROVIDERS: readonly PiLoginProvider[] = [
   {
     id: 'kimi-coding',
     route: 'pi-kimi-coding',
+    authType: 'oauth',
     displayName: 'Kimi For Coding',
     shortName: 'Kimi',
     blurb: 'Kimi Code subscription.',
@@ -82,6 +92,19 @@ export const PI_LOGIN_PROVIDERS: readonly PiLoginProvider[] = [
     allowedHosts: ['auth.kimi.com', 'kimi.com', 'www.kimi.com', 'api.kimi.com'],
     allowedSuffixes: ['.kimi.com'],
     preferredModels: ['kimi-for-coding', 'k3'],
+  },
+  {
+    id: 'zai-coding-cn',
+    route: 'pi-zai-coding-cn',
+    authType: 'api_key',
+    loginUrl: 'https://bigmodel.cn/coding-plan/personal/overview',
+    displayName: '智谱 GLM Coding Plan',
+    shortName: 'GLM',
+    blurb: 'Zhipu GLM Coding Plan (China) via its official Plan API key.',
+    blurbZh: '智谱 GLM Coding Plan 中国区套餐，使用套餐页签发的专用 API Key。',
+    allowedHosts: ['bigmodel.cn', 'www.bigmodel.cn', 'open.bigmodel.cn'],
+    allowedSuffixes: ['.bigmodel.cn'],
+    preferredModels: ['glm-5.3-flash', 'glm-5.2', 'glm-5-turbo', 'glm-5.1', 'glm-4.7'],
   },
 ]
 

@@ -9,14 +9,28 @@ import { PI_LOGIN_PROVIDERS, requirePiLoginProvider } from './catalog.ts'
 import type { PiLoginProvider } from './catalog.ts'
 import { isSafeAuthUrl, safeMessage } from './redact.ts'
 import type { PiLoginSession } from './session.ts'
+import { OPENROUTER_CATALOG_PATH, OPENROUTER_REFRESH_PATH } from './openrouter-types.ts'
 
 export const PI_LOGIN_AUTH_STATUS_PATH = '/plugins/dsh-oauth-login/auth/status'
 export const PI_LOGIN_AUTH_LOGIN_PATH = '/plugins/dsh-oauth-login/auth/login'
+export const PI_LOGIN_AUTH_COMPLETE_PATH = '/plugins/dsh-oauth-login/auth/complete'
 export const PI_LOGIN_AUTH_LOGOUT_PATH = '/plugins/dsh-oauth-login/auth/logout'
+
+export interface LoginInputChallenge {
+  type: 'secret' | 'text'
+  message: string
+  placeholder?: string
+}
 
 export type PiLoginAccountState =
   | { status: 'signed-out' }
-  | { status: 'signing-in'; url?: string; userCode?: string }
+  | {
+    status: 'signing-in'
+    kind?: 'browser' | 'input'
+    url?: string
+    userCode?: string
+    input?: LoginInputChallenge
+  }
   | { status: 'signed-in'; models: string[]; expiresAt?: string }
   | { status: 'error'; message: string }
 
@@ -25,13 +39,16 @@ export interface PiLoginProviderStatus {
   route: string
   displayName: string
   shortName: string
+  authType: PiLoginProvider['authType']
   account: PiLoginAccountState
 }
 
 export interface LoginChallenge {
   provider: string
-  url: string
+  kind: 'browser' | 'input'
+  url?: string
   userCode?: string
+  input?: LoginInputChallenge
 }
 
 function waitForPromptAbort(prompt: AuthPrompt): Promise<string> {
@@ -43,14 +60,18 @@ function waitForPromptAbort(prompt: AuthPrompt): Promise<string> {
   })
 }
 
-function answerWebPrompt(prompt: AuthPrompt): Promise<string> {
+function answerSelectPrompt(prompt: AuthPrompt): string | undefined {
   if (prompt.type === 'select') {
     const oauth = prompt.options.find(option => option.id === 'oauth' || option.id.includes('oauth'))
     const browser = prompt.options.find(option => option.id.includes('browser'))
-    return Promise.resolve(oauth?.id ?? browser?.id ?? prompt.options[0]?.id ?? 'oauth')
+    return oauth?.id ?? browser?.id ?? prompt.options[0]?.id ?? 'oauth'
   }
-  if (prompt.type === 'text') return Promise.resolve('')
-  return waitForPromptAbort(prompt)
+  return undefined
+}
+
+interface PendingInput {
+  resolve(value: string): void
+  reject(error: unknown): void
 }
 
 class ProviderAuth {
@@ -59,6 +80,7 @@ class ProviderAuth {
   private cancellation: AbortController | undefined
   private challenge: LoginChallenge | undefined
   private challengeWaiters: Array<{ resolve(value: LoginChallenge): void; reject(error: unknown): void }> = []
+  private pendingInput: PendingInput | undefined
 
   constructor(
     private readonly spec: PiLoginProvider,
@@ -80,11 +102,27 @@ class ProviderAuth {
   }
 
   async signOut(): Promise<void> {
-    this.cancellation?.abort(new Error('Pi login cancelled'))
+    const error = new Error('Pi login cancelled')
+    this.rejectInput(error)
+    this.cancellation?.abort(error)
     await this.operation?.catch(() => undefined)
     await this.session.logout(this.spec.id)
     this.state = { status: 'signed-out' }
     this.challenge = undefined
+  }
+
+  async submitInput(value: string): Promise<PiLoginAccountState> {
+    const pending = this.pendingInput
+    if (pending === undefined) {
+      throw new Error(`${this.spec.displayName} is not waiting for a credential`)
+    }
+    const normalized = value.trim()
+    if (normalized.length === 0) throw new Error('credential must not be empty')
+    if (normalized.length > 4096) throw new Error('credential is too long')
+    pending.resolve(normalized)
+    await this.operation?.catch(() => undefined)
+    if (this.state.status === 'error') throw new Error(this.state.message)
+    return this.state
   }
 
   /** Wait until an in-flight sign-in settles (success or error). No-op if idle. */
@@ -93,7 +131,9 @@ class ProviderAuth {
   }
 
   async dispose(): Promise<void> {
-    this.cancellation?.abort(new Error('Pi login plugin disposed'))
+    const error = new Error('Pi login plugin disposed')
+    this.rejectInput(error)
+    this.cancellation?.abort(error)
     await this.operation?.catch(() => undefined)
   }
 
@@ -101,10 +141,11 @@ class ProviderAuth {
     const cancellation = new AbortController()
     this.cancellation = cancellation
     this.challenge = undefined
+    this.pendingInput = undefined
     this.state = { status: 'signing-in' }
     this.operation = loginPiProviderSession(this.spec.id, {
       signal: cancellation.signal,
-      prompt: answerWebPrompt,
+      prompt: prompt => this.onPrompt(prompt),
       notify: event => { this.onEvent(event) },
     }, this.session).then(
       async () => {
@@ -112,6 +153,7 @@ class ProviderAuth {
       },
       (error: unknown) => {
         this.rejectChallenge(error)
+        this.rejectInput(error)
         this.state = { status: 'error', message: safeMessage(error) }
       },
     ).finally(() => {
@@ -120,22 +162,84 @@ class ProviderAuth {
     })
   }
 
+  private onPrompt(prompt: AuthPrompt): Promise<string> {
+    const selected = answerSelectPrompt(prompt)
+    if (selected !== undefined) return Promise.resolve(selected)
+    // Preserve the existing optional-text behavior in OAuth providers. Secret
+    // and manual-code prompts require an explicit local user action.
+    if (prompt.type === 'text' && this.spec.authType === 'oauth') return Promise.resolve('')
+    if (prompt.type === 'secret' || prompt.type === 'manual_code' || prompt.type === 'text') {
+      return this.requestInput(prompt)
+    }
+    return waitForPromptAbort(prompt)
+  }
+
+  private requestInput(prompt: AuthPrompt): Promise<string> {
+    if (this.pendingInput !== undefined) {
+      return Promise.reject(new Error(`${this.spec.displayName} already has a pending credential prompt`))
+    }
+    const input: LoginInputChallenge = {
+      type: prompt.type === 'secret' ? 'secret' : 'text',
+      message: prompt.message,
+      ...'placeholder' in prompt && prompt.placeholder !== undefined
+        ? { placeholder: prompt.placeholder }
+        : {},
+    }
+    const signals = [this.cancellation?.signal, prompt.signal]
+      .filter((signal): signal is AbortSignal => signal !== undefined)
+    const wait = new Promise<string>((resolve, reject) => {
+      let settled = false
+      const onAbort = (): void => {
+        const signal = signals.find(candidate => candidate.aborted)
+        settleReject(signal?.reason ?? new Error('credential prompt cancelled'))
+      }
+      const cleanup = (): void => {
+        for (const signal of signals) signal.removeEventListener('abort', onAbort)
+      }
+      const settleResolve = (value: string): void => {
+        if (settled) return
+        settled = true
+        cleanup()
+        this.pendingInput = undefined
+        resolve(value)
+      }
+      const settleReject = (error: unknown): void => {
+        if (settled) return
+        settled = true
+        cleanup()
+        this.pendingInput = undefined
+        reject(error)
+      }
+      this.pendingInput = { resolve: settleResolve, reject: settleReject }
+      for (const signal of signals) signal.addEventListener('abort', onAbort, { once: true })
+      if (signals.some(signal => signal.aborted)) onAbort()
+    })
+    this.acceptChallenge({
+      provider: this.spec.id,
+      kind: 'input',
+      ...this.spec.loginUrl === undefined ? {} : { url: this.spec.loginUrl },
+      input,
+    })
+    return wait
+  }
+
   private onEvent(event: AuthEvent): void {
     if (event.type === 'device_code') {
       this.acceptChallenge({
         provider: this.spec.id,
+        kind: 'browser',
         url: event.verificationUri,
         ...event.userCode.length > 0 ? { userCode: event.userCode } : {},
       })
       return
     }
     if (event.type === 'auth_url') {
-      this.acceptChallenge({ provider: this.spec.id, url: event.url })
+      this.acceptChallenge({ provider: this.spec.id, kind: 'browser', url: event.url })
     }
   }
 
   private acceptChallenge(challenge: LoginChallenge): void {
-    if (!isSafeAuthUrl(challenge.url, this.spec)) {
+    if (challenge.url !== undefined && !isSafeAuthUrl(challenge.url, this.spec)) {
       const error = new Error(`${this.spec.id} returned an authorization URL outside its official hosts`)
       this.cancellation?.abort(error)
       this.rejectChallenge(error)
@@ -144,8 +248,10 @@ class ProviderAuth {
     this.challenge = challenge
     this.state = {
       status: 'signing-in',
-      url: challenge.url,
+      kind: challenge.kind,
+      ...challenge.url === undefined ? {} : { url: challenge.url },
       ...challenge.userCode === undefined ? {} : { userCode: challenge.userCode },
+      ...challenge.input === undefined ? {} : { input: challenge.input },
     }
     for (const waiter of this.challengeWaiters.splice(0)) waiter.resolve(challenge)
   }
@@ -164,6 +270,10 @@ class ProviderAuth {
 
   private rejectChallenge(error: unknown): void {
     for (const waiter of this.challengeWaiters.splice(0)) waiter.reject(error)
+  }
+
+  private rejectInput(error: unknown): void {
+    this.pendingInput?.reject(error)
   }
 }
 
@@ -186,6 +296,7 @@ export class PiLoginWebAuth {
 
   async status(): Promise<PiLoginProviderStatus[]> {
     await this.session.refreshStoredGrants()
+    await this.session.openRouter.syncAuthentication()
     const out: PiLoginProviderStatus[] = []
     for (const spec of PI_LOGIN_PROVIDERS) {
       out.push({
@@ -193,6 +304,7 @@ export class PiLoginWebAuth {
         route: spec.route,
         displayName: spec.displayName,
         shortName: spec.shortName,
+        authType: spec.authType,
         account: await this.slot(spec.id).snapshot(),
       })
     }
@@ -207,6 +319,11 @@ export class PiLoginWebAuth {
   async signOut(id: string): Promise<void> {
     requirePiLoginProvider(id)
     await this.slot(id).signOut()
+  }
+
+  async submitInput(id: string, value: string): Promise<PiLoginAccountState> {
+    requirePiLoginProvider(id)
+    return this.slot(id).submitInput(value)
   }
 
   /** Wait until the named provider's in-flight sign-in settles. */
@@ -263,6 +380,23 @@ function providerIdFrom(value: unknown): string {
   return requirePiLoginProvider(value.provider).id
 }
 
+function providerInputFrom(value: unknown): { providerId: string; value: string } {
+  if (
+    typeof value !== 'object'
+    || value === null
+    || !('provider' in value)
+    || typeof value.provider !== 'string'
+    || !('value' in value)
+    || typeof value.value !== 'string'
+  ) {
+    throw new Error('expected { "provider": "<id>", "value": "<credential>" }')
+  }
+  return {
+    providerId: requirePiLoginProvider(value.provider).id,
+    value: value.value,
+  }
+}
+
 export interface PiLoginAuthRouteOptions {
   /** Called after a successful sign-in or sign-out so the host can refresh LLM routes. */
   onAuthChanged?: () => void | Promise<void>
@@ -281,6 +415,38 @@ export function registerPiLoginAuthRoutes(
     const routes = [
       ctx.webServer.register({
         kind: 'exact',
+        path: OPENROUTER_CATALOG_PATH,
+        handler: async (req, res) => {
+          if (req.method !== 'GET') return json(res, 405, { error: 'method not allowed' })
+          if (!trustedRequest(req)) return json(res, 403, { error: 'forbidden' })
+          try {
+            await session.openRouter.syncAuthentication()
+            json(res, 200, session.openRouter.snapshot())
+          } catch {
+            json(res, 503, { error: 'OpenRouter model catalog unavailable' })
+          }
+        },
+      }),
+      ctx.webServer.register({
+        kind: 'exact',
+        path: OPENROUTER_REFRESH_PATH,
+        handler: async (req, res) => {
+          if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
+          if (!trustedRequest(req)) return json(res, 403, { error: 'forbidden' })
+          try {
+            await session.openRouter.syncAuthentication()
+            if (!session.openRouter.snapshot().connected) {
+              return json(res, 409, { error: 'Sign in to OpenRouter first' })
+            }
+            await session.openRouter.refresh(true)
+            json(res, 200, session.openRouter.snapshot())
+          } catch {
+            json(res, 503, { error: 'OpenRouter model catalog unavailable' })
+          }
+        },
+      }),
+      ctx.webServer.register({
+        kind: 'exact',
         path: PI_LOGIN_AUTH_STATUS_PATH,
         handler: async (req, res) => {
           if (req.method !== 'GET') return json(res, 405, { error: 'method not allowed' })
@@ -296,11 +462,29 @@ export function registerPiLoginAuthRoutes(
           if (!trustedRequest(req)) return json(res, 403, { error: 'forbidden' })
           try {
             const challenge = await auth.signIn(providerIdFrom(await readJson(req)))
-            // Login finishes in the browser; refresh LLM routes once the grant lands.
-            void auth.waitUntilSettled(challenge.provider).then(async () => {
-              await notifyAuthChanged()
-            })
+            if (challenge.kind === 'browser') {
+              // OAuth finishes in the browser; refresh LLM routes once the grant lands.
+              void auth.waitUntilSettled(challenge.provider).then(async () => {
+                await notifyAuthChanged()
+              })
+            }
             json(res, 200, challenge)
+          } catch (error: unknown) {
+            json(res, 500, { error: safeMessage(error) })
+          }
+        },
+      }),
+      ctx.webServer.register({
+        kind: 'exact',
+        path: PI_LOGIN_AUTH_COMPLETE_PATH,
+        handler: async (req, res) => {
+          if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
+          if (!trustedRequest(req)) return json(res, 403, { error: 'forbidden' })
+          try {
+            const submission = providerInputFrom(await readJson(req))
+            const account = await auth.submitInput(submission.providerId, submission.value)
+            await notifyAuthChanged()
+            json(res, 200, { ok: true, account })
           } catch (error: unknown) {
             json(res, 500, { error: safeMessage(error) })
           }

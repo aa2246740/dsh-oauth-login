@@ -1,7 +1,13 @@
 /** One PiAiAdapter covering every Pi-login harness route. */
 
-import { LlmError, resolveRetryPolicy } from '@deepseek-ai/dsh-llm'
-import type { GenerateOptions, RetryPolicyConfig, StreamChunk } from '@deepseek-ai/dsh-llm'
+import { LlmError, ReasoningEffortId, resolveRetryPolicy } from '@deepseek-ai/dsh-llm'
+import { defaultProviderAuthContext } from '@earendil-works/pi-ai'
+import type {
+  GenerateOptions,
+  LlmResolvedModelInfo,
+  RetryPolicyConfig,
+  StreamChunk,
+} from '@deepseek-ai/dsh-llm'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
 import type {
   PiAiAdapterOptions as BasePiAiAdapterOptions,
@@ -9,6 +15,7 @@ import type {
 } from '@deepseek-ai/dsh-llm-pi-ai'
 import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import { PI_LOGIN_PROVIDERS, piLoginProviderByRoute } from './catalog.ts'
+import { defaultReasoningEffortFor } from './extra-models.ts'
 import { iterateInCapture } from './hosted-capture.ts'
 import type { HostedCapture } from './hosted-capture.ts'
 import { injectHostedImages, stripAssistantImages } from './hosted-images.ts'
@@ -18,6 +25,8 @@ import {
 } from './ids.ts'
 import { hintFailure, withModelErrorHint } from './model-error-hint.ts'
 import type { PiLoginSession } from './session.ts'
+import { openRouterDefaultEffort } from './openrouter-models.ts'
+import { OPENROUTER_ROUTE } from './openrouter-types.ts'
 import { filterHostedServerToolTraces, nativePlanForRoute } from './native-tools.ts'
 import type { NativeToolPolicy } from './native-tools.ts'
 
@@ -36,15 +45,43 @@ class PiLoginAdapter extends PiAiAdapter {
     config: BasePiAiAdapterOptions,
     private readonly native: NativeToolPolicy,
     private readonly resolveAttachments: () => AttachmentStore | undefined,
+    private readonly session: PiLoginSession,
   ) {
     super(config)
   }
 
+  override resolveModel(
+    provider: string,
+    model: string,
+    signal?: AbortSignal,
+  ): Promise<LlmResolvedModelInfo> {
+    return super.resolveModel(provider, model, signal).then((info) => {
+      const defaultEffort = this.defaultEffort(provider, model)
+      if (defaultEffort === undefined || info.reasoning === undefined) return info
+      return {
+        ...info,
+        reasoning: {
+          ...info.reasoning,
+          defaultEffort: ReasoningEffortId(defaultEffort),
+        },
+      }
+    })
+  }
+
+  private defaultEffort(provider: string, model: string): string | undefined {
+    return (provider === OPENROUTER_ROUTE ? openRouterDefaultEffort(this.session.openRouter.model(model)) : undefined)
+      ?? defaultReasoningEffortFor(model)
+  }
+
   override async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     const capture: HostedCapture = { images: [] }
+    const defaultEffort = this.defaultEffort(options.provider, options.model)
     const sanitized: GenerateOptions = {
       ...options,
       messages: stripAssistantImages(options.messages),
+      ...options.reasoningEffort === undefined && defaultEffort !== undefined
+        ? { reasoningEffort: ReasoningEffortId(defaultEffort) }
+        : {},
     }
     try {
       const raw = iterateInCapture(capture, super.stream(sanitized))
@@ -80,6 +117,16 @@ export function createPiLoginAdapter(
 ): PiAiAdapter {
   const streamIdleTimeoutMs = options.streamIdleTimeoutMs ?? PI_LOGIN_STREAM_IDLE_TIMEOUT_MS
   const retryPolicy = resolveRetryPolicy(options.retryPolicy, 'dsh-oauth-login retryPolicy')
+  const requestImageLimits = {
+    requestImagePixelBudget: 2048 * 2048,
+    requestImageMaxBytes: 1024 * 1024,
+  }
+  const auth = {
+    auth: {
+      credentials: session.store,
+      authContext: defaultProviderAuthContext(),
+    },
+  }
   return new PiLoginAdapter({
     profiles: () => {
       const profiles = new Map<string, ResolvedPiAiProviderProfile>()
@@ -89,6 +136,7 @@ export function createPiLoginAdapter(
           displayName: spec.displayName,
           streamIdleTimeoutMs,
           maxRequestImageBytes: PI_LOGIN_MAX_REQUEST_IMAGE_BYTES,
+          ...requestImageLimits,
           retryPolicy,
           configuredMaxTokens: new Map(),
           piProvider: session.provider(spec.id),
@@ -106,12 +154,13 @@ export function createPiLoginAdapter(
       const apiKey = auth?.auth.apiKey
       if (apiKey === undefined || apiKey.length === 0) {
         throw new LlmError(
-          `${spec.displayName} is not signed in. Open Settings → OAuth Login and sign in.`,
+          `${spec.displayName} is not connected. Open Settings → Subscription Login and connect it.`,
           'MISSING_CREDENTIAL',
         )
       }
       return apiKey
     },
     resolveAttachments,
-  }, session.native, resolveAttachments)
+    ...auth,
+  }, session.native, resolveAttachments, session)
 }

@@ -1,36 +1,58 @@
 /** Plugin-owned Pi login page inside the dsh Settings shell. */
 
 import { useCallback, useEffect, useState } from 'react'
+import { applyDraftChange } from './draft-input.ts'
+import type { Drafts } from './draft-input.ts'
 import type { PiLoginKey } from './locales.ts'
+import type { OpenRouterCatalogClient } from './openrouter-store.ts'
+import { OpenRouterSyncStatus } from './OpenRouterSyncStatus.tsx'
 
 const STATUS_PATH = '/plugins/dsh-oauth-login/auth/status'
 const LOGIN_PATH = '/plugins/dsh-oauth-login/auth/login'
+const COMPLETE_PATH = '/plugins/dsh-oauth-login/auth/complete'
 const LOGOUT_PATH = '/plugins/dsh-oauth-login/auth/logout'
 const POLL_INTERVAL_MS = 1_000
 const STYLE_ID = 'dsh-pi-login-settings-theme'
 
 type AccountState =
   | { status: 'signed-out' }
-  | { status: 'signing-in'; url?: string; userCode?: string }
+  | {
+    status: 'signing-in'
+    kind?: 'browser' | 'input'
+    url?: string
+    userCode?: string
+    input?: LoginInputChallenge
+  }
   | { status: 'signed-in'; models?: string[]; expiresAt?: string }
   | { status: 'error'; message: string }
+
+interface LoginInputChallenge {
+  type: 'secret' | 'text'
+  message: string
+  placeholder?: string
+}
 
 interface ProviderStatus {
   id: string
   route: string
   displayName: string
   shortName: string
+  authType: 'oauth' | 'api_key'
   account: AccountState
 }
 
 interface LoginChallenge {
   provider: string
-  url: string
+  kind: 'browser' | 'input'
+  url?: string
   userCode?: string
+  input?: LoginInputChallenge
 }
 
 export interface PiLoginSettingsInjected {
   t: (key: PiLoginKey, params?: Record<string, unknown>) => string
+  ts: (key: string, params?: Record<string, unknown>) => string
+  catalog: OpenRouterCatalogClient
 }
 
 export type PiLoginSettingsProps = Partial<PiLoginSettingsInjected>
@@ -83,6 +105,18 @@ const SETTINGS_CSS = `
   font-size:18px; letter-spacing:0.08em; font-weight:600; color:var(--dsw-alias-label-primary);
 }
 .dsh-pi-login-link { color:var(--dsw-alias-brand-primary); word-break:break-all; }
+.dsh-pi-login-form { display:flex; flex-direction:column; gap:8px; }
+.dsh-pi-login-input {
+  box-sizing:border-box; width:100%; min-height:36px; padding:7px 10px;
+  border:1px solid var(--dsw-alias-border-l2); border-radius:8px;
+  background:var(--dsw-alias-bg-page-primary, transparent);
+  color:var(--dsw-alias-label-primary); font:inherit; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.dsh-pi-login-input:focus {
+  outline:2px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 28%, transparent);
+  border-color:var(--dsw-alias-brand-primary);
+}
+.dsh-pi-login-actions { display:flex; justify-content:flex-end; }
 `
 
 function ensureThemeStyles(): void {
@@ -111,22 +145,24 @@ async function jsonRequest<T>(path: string, method = 'GET', body?: unknown): Pro
   return value as T
 }
 
-export function PiLoginSettings({ t }: PiLoginSettingsProps) {
+export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
   if (t === undefined) throw new Error('Pi login settings requires its translation function')
   const [providers, setProviders] = useState<ProviderStatus[] | undefined>(undefined)
   const [error, setError] = useState<string | undefined>(undefined)
   const [busy, setBusy] = useState<string | undefined>(undefined)
+  const [drafts, setDrafts] = useState<Drafts>({})
 
   useEffect(() => { ensureThemeStyles() }, [])
 
   const refresh = useCallback(async () => {
     try {
       setProviders(await jsonRequest<ProviderStatus[]>(STATUS_PATH))
+      void catalog?.load()
       setError(undefined)
     } catch (caught: unknown) {
       setError(caught instanceof Error ? caught.message : t('requestFailed'))
     }
-  }, [t])
+  }, [t, catalog])
 
   useEffect(() => { void refresh() }, [refresh])
   const signing = providers?.some(provider => provider.account.status === 'signing-in') ?? false
@@ -142,14 +178,32 @@ export function PiLoginSettings({ t }: PiLoginSettingsProps) {
     setBusy(id)
     try {
       const challenge = await jsonRequest<LoginChallenge>(LOGIN_PATH, 'POST', { provider: id })
-      if (popup === null) {
-        await refresh()
-        return
-      }
-      popup.location.replace(challenge.url)
+      if (popup !== null && challenge.url !== undefined) popup.location.replace(challenge.url)
+      if (popup !== null && challenge.url === undefined) popup.close()
       await refresh()
     } catch (caught: unknown) {
       popup?.close()
+      setError(caught instanceof Error ? caught.message : t('requestFailed'))
+    } finally {
+      setBusy(undefined)
+    }
+  }
+
+  const submitInput = async (id: string): Promise<void> => {
+    const value = drafts[id]?.trim() ?? ''
+    if (value.length === 0) {
+      setError(t('credentialRequired'))
+      return
+    }
+    setBusy(id)
+    try {
+      await jsonRequest<{ ok: true }>(COMPLETE_PATH, 'POST', { provider: id, value })
+      setDrafts(current => {
+        const { [id]: _removed, ...next } = current
+        return next
+      })
+      await refresh()
+    } catch (caught: unknown) {
       setError(caught instanceof Error ? caught.message : t('requestFailed'))
     } finally {
       setBusy(undefined)
@@ -181,7 +235,7 @@ export function PiLoginSettings({ t }: PiLoginSettingsProps) {
                 const label = account.status === 'signed-in'
                   ? t('signedIn')
                   : account.status === 'signing-in'
-                    ? t('signingIn')
+                    ? account.input === undefined ? t('signingIn') : t('waitingForCredential')
                     : account.status === 'error'
                       ? t('requestFailed')
                       : t('signedOut')
@@ -214,7 +268,13 @@ export function PiLoginSettings({ t }: PiLoginSettingsProps) {
                               disabled={busy !== undefined}
                               onClick={() => { void signIn(provider.id) }}
                             >
-                              {busy === provider.id ? t('working') : account.status === 'error' ? t('loginAgain') : t('login')}
+                              {busy === provider.id
+                                ? t('working')
+                                : account.status === 'error'
+                                  ? t('loginAgain')
+                                  : provider.authType === 'api_key'
+                                    ? t('connectPlan')
+                                    : t('login')}
                             </button>
                           )}
                     </div>
@@ -222,6 +282,8 @@ export function PiLoginSettings({ t }: PiLoginSettingsProps) {
                       <span aria-hidden="true" className={dotClass} />
                       <span>{label}</span>
                     </div>
+                    {provider.id === 'openrouter' && catalog !== undefined && ts !== undefined
+                      && <OpenRouterSyncStatus catalog={catalog} ts={ts} details />}
                     {account.status === 'error' ? <p className="dsh-pi-login-error">{account.message}</p> : null}
                     {account.status === 'signing-in' && account.userCode !== undefined
                       ? <p className="dsh-pi-login-body">{t('userCode')} <span className="dsh-pi-login-code">{account.userCode}</span></p>
@@ -229,10 +291,45 @@ export function PiLoginSettings({ t }: PiLoginSettingsProps) {
                     {account.status === 'signing-in' && account.url !== undefined
                       ? (
                           <p className="dsh-pi-login-body">
-                            {t('openUrl')}
+                            {account.input === undefined ? t('openUrl') : t('openPlanPage')}
                             {' '}
                             <a href={account.url} target="_blank" rel="noreferrer" className="dsh-pi-login-link">{account.url}</a>
                           </p>
+                        )
+                      : null}
+                    {account.status === 'signing-in' && account.input !== undefined
+                      ? (
+                          <form
+                            className="dsh-pi-login-form"
+                            onSubmit={(event) => {
+                              event.preventDefault()
+                              void submitInput(provider.id)
+                            }}
+                          >
+                            <p className="dsh-pi-login-body">{t('credentialHelp')}</p>
+                            <input
+                              type={account.input.type === 'secret' ? 'password' : 'text'}
+                              className="dsh-pi-login-input"
+                              aria-label={account.input.message}
+                              autoComplete="off"
+                              spellCheck={false}
+                              placeholder={t('credentialPlaceholder')}
+                              value={drafts[provider.id] ?? ''}
+                              disabled={busy !== undefined}
+                              onChange={(event) => {
+                                applyDraftChange(provider.id, event, setDrafts)
+                              }}
+                            />
+                            <div className="dsh-pi-login-actions">
+                              <button
+                                type="submit"
+                                className="dsh-pi-login-btn dsh-pi-login-btn-primary"
+                                disabled={busy !== undefined || (drafts[provider.id]?.trim().length ?? 0) === 0}
+                              >
+                                {busy === provider.id ? t('working') : t('saveCredential')}
+                              </button>
+                            </div>
+                          </form>
                         )
                       : null}
                   </article>

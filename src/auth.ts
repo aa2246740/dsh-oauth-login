@@ -11,6 +11,7 @@ import { PiLoginCredentialStore } from './store.ts'
 export interface PiLoginAuthStatus {
   providerId: string
   authenticated: boolean
+  credentialType?: 'oauth' | 'api_key'
   expiresAt?: Date
 }
 
@@ -19,11 +20,11 @@ export async function loginPiProvider(
   interaction: AuthInteraction,
   store: PiLoginCredentialStore = new PiLoginCredentialStore(),
 ): Promise<void> {
-  requirePiLoginProvider(providerId)
+  const spec = requirePiLoginProvider(providerId)
   await configureOAuthHttpTransport()
   const models = createModels({ credentials: store })
   models.setProvider(catalogProvider(providerId))
-  await models.login(providerId, 'oauth', interaction)
+  await models.login(providerId, spec.authType, interaction)
 }
 
 export async function logoutPiProvider(
@@ -42,9 +43,20 @@ export async function piLoginStatus(
   const out: PiLoginAuthStatus[] = []
   for (const id of ids) {
     const credential = await store.read(id)
-    out.push(credential?.type === 'oauth'
-      ? { providerId: id, authenticated: true, expiresAt: new Date(credential.expires) }
-      : { providerId: id, authenticated: false })
+    if (credential?.type === 'oauth') {
+      out.push({
+        providerId: id,
+        authenticated: true,
+        credentialType: 'oauth',
+        expiresAt: new Date(credential.expires),
+      })
+      continue
+    }
+    if (credential?.type === 'api_key' && typeof credential.key === 'string' && credential.key.length > 0) {
+      out.push({ providerId: id, authenticated: true, credentialType: 'api_key' })
+      continue
+    }
+    out.push({ providerId: id, authenticated: false })
   }
   return out
 }
@@ -54,8 +66,9 @@ export async function loginPiProviderSession(
   interaction: AuthInteraction,
   session: PiLoginSession,
 ): Promise<void> {
-  requirePiLoginProvider(providerId)
+  const spec = requirePiLoginProvider(providerId)
   await session.ensureTransport()
   session.models.setProvider(catalogProvider(providerId))
-  await session.models.login(providerId, 'oauth', interaction)
+  await session.models.login(providerId, spec.authType, interaction)
+  if (providerId === 'openrouter') await session.openRouter.syncAuthentication('login')
 }

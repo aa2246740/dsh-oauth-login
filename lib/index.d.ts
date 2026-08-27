@@ -1,7 +1,7 @@
 import { LlmFailure, Message, RetryPolicyConfig, StreamChunk } from "@deepseek-ai/dsh-llm";
+import { Api, AuthInteraction, Context, Credential, CredentialInfo, CredentialStore, Model, MutableModels, Provider, StreamOptions } from "@earendil-works/pi-ai";
 import { PiAiAdapter } from "@deepseek-ai/dsh-llm-pi-ai";
 import { AsyncLocalStorage } from "node:async_hooks";
-import { Api, AuthInteraction, Context, Credential, CredentialInfo, CredentialStore, Model, MutableModels, Provider, StreamOptions } from "@earendil-works/pi-ai";
 import z from "@deepseek-ai/schemastery";
 import { Context as Context$1 } from "@deepseek-ai/cordis";
 import { AttachmentStore, ImageAttachmentRef, ImageMediaType, SaveImageAttachment } from "@deepseek-ai/dsh-attachment";
@@ -31,6 +31,10 @@ interface PiLoginProvider {
   readonly id: string;
   /** Harness LLM route. Distinct from catalog routes and from other plugins. */
   readonly route: string;
+  /** Credential method this plugin deliberately exposes for this provider. */
+  readonly authType: 'oauth' | 'api_key';
+  /** Official account page opened before an interactive API-key prompt. */
+  readonly loginUrl?: string;
   readonly displayName: string;
   readonly shortName: string;
   readonly blurb: string;
@@ -123,13 +127,98 @@ declare class PiLoginCredentialStore implements CredentialStore {
   delete(providerId: string): Promise<void>;
 }
 //#endregion
+//#region src/openrouter-types.d.ts
+interface OpenRouterModel {
+  id: string;
+  name: string;
+  contextWindow: number;
+  maxTokens: number;
+  inputModalities: string[];
+  outputModalities: string[];
+  supportedParameters: string[];
+  tools: boolean;
+  reasoning: boolean;
+  reasoningMandatory: boolean;
+  supportedEfforts?: string[];
+  defaultEffort?: string;
+  /** USD per token/unit as supplied by the official catalog, not pi-ai costs. */
+  pricing: Record<string, string>;
+  priceStatus: 'free' | 'paid' | 'unknown';
+  /** Endpoint deprecation, NEVER interpreted as a promotion deadline. */
+  deprecatesAt?: string;
+}
+interface OpenRouterCatalogSnapshot {
+  version: 1;
+  connected: boolean;
+  refreshing: boolean;
+  source: 'builtin' | 'cache' | 'live';
+  lastUpdatedAt: number | null;
+  lastAttemptAt: number | null;
+  nextRefreshAt: number | null;
+  retryAt: number | null;
+  stale: boolean;
+  error: 'fetch' | 'cache' | 'save' | null;
+  models: Array<OpenRouterModel & {
+    freeOnly: boolean;
+  }>;
+}
+//#endregion
+//#region src/openrouter-catalog.d.ts
+interface OpenRouterCatalogOptions {
+  filename: string;
+  isAuthenticated: () => Promise<boolean>;
+  beforeFetch?: () => Promise<unknown>;
+  fetch?: typeof globalThis.fetch;
+  now?: () => number;
+  /** Protect zero-cost legacy selections too, without labelling them free. */
+  initiallyProtectedIds?: readonly string[];
+}
+declare class OpenRouterCatalog {
+  private readonly options;
+  private entries;
+  private protectedIds;
+  private connected;
+  private disposed;
+  private source;
+  private lastUpdatedAt;
+  private lastAttemptAt;
+  private nextRefreshAt;
+  private error;
+  private hydration;
+  private pending;
+  private controller;
+  private timer;
+  private generation;
+  private readonly listeners;
+  private readonly now;
+  constructor(options: OpenRouterCatalogOptions);
+  models(): readonly OpenRouterModel[] | undefined;
+  model(id: string): OpenRouterModel | undefined;
+  protects(id: string): boolean;
+  subscribe(listener: () => void): () => void;
+  private changed;
+  snapshot(): OpenRouterCatalogSnapshot;
+  private hydrate;
+  private readCache;
+  private rememberFree;
+  /** Startup reads disk first; only a newly completed login forces a refresh. */
+  syncAuthentication(reason?: 'check' | 'login'): Promise<void>;
+  /** Coalesced across routes/windows; even forced refreshes honor 60s cooldown. */
+  refresh(force?: boolean): Promise<void>;
+  private fetchCatalog;
+  private schedule;
+  disconnect(): void;
+  dispose(): void;
+}
+//#endregion
 //#region src/session.d.ts
 declare class PiLoginSession {
   readonly store: PiLoginCredentialStore;
   readonly models: MutableModels;
   readonly native: NativeToolPolicy;
+  readonly openRouter: OpenRouterCatalog;
   private transportPromise?;
-  constructor(store?: PiLoginCredentialStore, native?: NativeToolPolicy);
+  constructor(store?: PiLoginCredentialStore, native?: NativeToolPolicy, catalogOptions?: Partial<Pick<OpenRouterCatalogOptions, 'fetch' | 'now' | 'filename'>>);
   ensureTransport(): Promise<OAuthProxyResolution>;
   spec(id: string): PiLoginProvider;
   provider(id: string): import("@earendil-works/pi-ai").Provider<import("@earendil-works/pi-ai").Api>;
@@ -158,6 +247,7 @@ declare function createPiLoginAdapter(session: PiLoginSession, resolveAttachment
 interface PiLoginAuthStatus {
   providerId: string;
   authenticated: boolean;
+  credentialType?: 'oauth' | 'api_key';
   expiresAt?: Date;
 }
 declare function loginPiProvider(providerId: string, interaction: AuthInteraction, store?: PiLoginCredentialStore): Promise<void>;
@@ -168,13 +258,21 @@ declare function loginPiProviderSession(providerId: string, interaction: AuthInt
 //#region src/auth-routes.d.ts
 declare const PI_LOGIN_AUTH_STATUS_PATH = "/plugins/dsh-oauth-login/auth/status";
 declare const PI_LOGIN_AUTH_LOGIN_PATH = "/plugins/dsh-oauth-login/auth/login";
+declare const PI_LOGIN_AUTH_COMPLETE_PATH = "/plugins/dsh-oauth-login/auth/complete";
 declare const PI_LOGIN_AUTH_LOGOUT_PATH = "/plugins/dsh-oauth-login/auth/logout";
+interface LoginInputChallenge {
+  type: 'secret' | 'text';
+  message: string;
+  placeholder?: string;
+}
 type PiLoginAccountState = {
   status: 'signed-out';
 } | {
   status: 'signing-in';
+  kind?: 'browser' | 'input';
   url?: string;
   userCode?: string;
+  input?: LoginInputChallenge;
 } | {
   status: 'signed-in';
   models: string[];
@@ -188,12 +286,15 @@ interface PiLoginProviderStatus {
   route: string;
   displayName: string;
   shortName: string;
+  authType: PiLoginProvider['authType'];
   account: PiLoginAccountState;
 }
 interface LoginChallenge {
   provider: string;
-  url: string;
+  kind: 'browser' | 'input';
+  url?: string;
   userCode?: string;
+  input?: LoginInputChallenge;
 }
 interface PiLoginAuthRouteOptions {
   /** Called after a successful sign-in or sign-out so the host can refresh LLM routes. */
@@ -202,6 +303,18 @@ interface PiLoginAuthRouteOptions {
 declare function registerPiLoginAuthRoutes(ctx: Context$1, session: PiLoginSession, options?: PiLoginAuthRouteOptions): void;
 //#endregion
 //#region src/extra-models.d.ts
+declare const GLM_5_3_FLASH_DEFAULT_EFFORT = "max";
+/** OpenRouter stealth model missing from the installed pi-ai catalog (0.82.x–0.84.x). */
+declare const OX_ALPHA_MODEL_ID = "stealth/ox-alpha";
+/**
+ * OpenRouter's live default for ox-alpha (`reasoning.default_effort`).
+ * Must be sent explicitly: pi-ai's OpenRouter dialect writes
+ * `reasoning: { effort: thinkingLevelMap.off ?? "none" }` when the caller
+ * omits an effort, and ox-alpha rejects `none` (`reasoning.mandatory: true`).
+ */
+declare const OX_ALPHA_DEFAULT_EFFORT = "max";
+/** Per-model default the selector and request path should apply when omitted. */
+declare function defaultReasoningEffortFor(modelId: string): typeof OX_ALPHA_DEFAULT_EFFORT | typeof GLM_5_3_FLASH_DEFAULT_EFFORT | undefined;
 /**
  * Extra models this plugin publishes for one pi-ai provider id.
  * @param providerId - catalog provider id (e.g. `xai`), not the harness route.
@@ -272,15 +385,11 @@ declare function withModelErrorHint(error: unknown): unknown;
 //#endregion
 //#region src/provider.d.ts
 declare function catalogProvider(id: string): Provider;
-/**
- * Catalog models plus plugin-owned extras, remapped onto the harness route.
- * Extras fill gaps the installed pi-ai version has not shipped yet (e.g. grok-4.6).
- */
-declare function harnessModels(spec: PiLoginProvider): Model<Api>[];
+declare function harnessModels(spec: PiLoginProvider, catalog?: OpenRouterCatalog): Model<Api>[];
 declare function preferredModel(spec: PiLoginProvider, models?: readonly {
   id: string;
 }[]): string;
-declare function harnessProvider(spec: PiLoginProvider, native?: NativeToolPolicy): Provider;
+declare function harnessProvider(spec: PiLoginProvider, native?: NativeToolPolicy, catalog?: OpenRouterCatalog): Provider;
 //#endregion
 //#region src/redact.d.ts
 /** Remove token-like strings from an external OAuth diagnostic. */
@@ -314,4 +423,4 @@ declare const name = "llm-oauth-login";
 declare const inject: string[];
 declare function apply(ctx: Context$1, config: Config): void;
 //#endregion
-export { Config, type Config as PluginConfig, DEFAULT_NATIVE_TOOL_POLICY, LEGACY_PI_LOGIN_AUTH_FILENAME, type LoginChallenge, type NativeToolPlan, type NativeToolPolicy, OAUTH_REFRESH_POLL_MS, OAUTH_REFRESH_SOON_MS, PI_LOGIN_AUTH_FILENAME, PI_LOGIN_AUTH_LOGIN_PATH, PI_LOGIN_AUTH_LOGOUT_PATH, PI_LOGIN_AUTH_STATUS_PATH, PI_LOGIN_BOOT_MARKER, PI_LOGIN_PROVIDERS, PI_LOGIN_ROUTE_PREFIX, PI_LOGIN_STREAM_IDLE_TIMEOUT_MS, type PiLoginAdapterOptions, type PiLoginAuthStatus, PiLoginCredentialStore, type PiLoginProvider, type PiLoginProviderStatus, PiLoginSession, QUOTA_HINT, RATE_LIMIT_HINT, TRANSIENT_HINT, TRANSIENT_MODEL_CODES, apply, applyNativeToolsToPayload, catalogProvider, collectHostedImagesFromEvent, createPiLoginAdapter, decodeHostedImage, extraModelsFor, filterHostedServerToolTraces, filterXaiServerToolTraces, grantNeedsRefresh, harnessModels, harnessProvider, hintFailure, hintForCode, inject, injectHostedImages, isHostedSearchReasoningReplay, isHostedServerToolCall, isSafeAuthUrl, isXaiServerXSearchCall, loginPiProvider, loginPiProviderSession, logoutPiProvider, name, nativePlan, nativePlanForRoute, piLoginAuthPath, piLoginProvider, piLoginRoutes, piLoginStatus, preferredModel, prepareNativeToolRequest, registerPiLoginAuthRoutes, safeMessage, sniffImageMediaType, stripAssistantImages, withModelErrorHint };
+export { Config, type Config as PluginConfig, DEFAULT_NATIVE_TOOL_POLICY, LEGACY_PI_LOGIN_AUTH_FILENAME, type LoginChallenge, type LoginInputChallenge, type NativeToolPlan, type NativeToolPolicy, OAUTH_REFRESH_POLL_MS, OAUTH_REFRESH_SOON_MS, OX_ALPHA_DEFAULT_EFFORT, OX_ALPHA_MODEL_ID, PI_LOGIN_AUTH_COMPLETE_PATH, PI_LOGIN_AUTH_FILENAME, PI_LOGIN_AUTH_LOGIN_PATH, PI_LOGIN_AUTH_LOGOUT_PATH, PI_LOGIN_AUTH_STATUS_PATH, PI_LOGIN_BOOT_MARKER, PI_LOGIN_PROVIDERS, PI_LOGIN_ROUTE_PREFIX, PI_LOGIN_STREAM_IDLE_TIMEOUT_MS, type PiLoginAdapterOptions, type PiLoginAuthStatus, PiLoginCredentialStore, type PiLoginProvider, type PiLoginProviderStatus, PiLoginSession, QUOTA_HINT, RATE_LIMIT_HINT, TRANSIENT_HINT, TRANSIENT_MODEL_CODES, apply, applyNativeToolsToPayload, catalogProvider, collectHostedImagesFromEvent, createPiLoginAdapter, decodeHostedImage, defaultReasoningEffortFor, extraModelsFor, filterHostedServerToolTraces, filterXaiServerToolTraces, grantNeedsRefresh, harnessModels, harnessProvider, hintFailure, hintForCode, inject, injectHostedImages, isHostedSearchReasoningReplay, isHostedServerToolCall, isSafeAuthUrl, isXaiServerXSearchCall, loginPiProvider, loginPiProviderSession, logoutPiProvider, name, nativePlan, nativePlanForRoute, piLoginAuthPath, piLoginProvider, piLoginRoutes, piLoginStatus, preferredModel, prepareNativeToolRequest, registerPiLoginAuthRoutes, safeMessage, sniffImageMediaType, stripAssistantImages, withModelErrorHint };

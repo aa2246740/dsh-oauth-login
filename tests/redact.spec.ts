@@ -5,8 +5,8 @@ import { isSafeAuthUrl, safeMessage } from '../src/redact.ts'
 describe('safeMessage', () => {
   it('redacts jwt-shaped tokens and oauth query values', () => {
     const jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0In0.signaturepart'
-    expect(safeMessage(new Error(`failed ${jwt} access_token=abc.def`))).toBe(
-      'failed [redacted token] access_token=[redacted]',
+    expect(safeMessage(new Error(`failed ${jwt} access_token=abc.def api_key=zhipu-secret`))).toBe(
+      'failed [redacted token] access_token=[redacted] api_key=[redacted]',
     )
   })
 })
@@ -16,6 +16,10 @@ describe('isSafeAuthUrl', () => {
     expect(isSafeAuthUrl('https://auth.openai.com/oauth', requirePiLoginProvider('openai-codex'))).toBe(true)
     expect(isSafeAuthUrl('https://auth.x.ai/device', requirePiLoginProvider('xai'))).toBe(true)
     expect(isSafeAuthUrl('https://claude.ai/oauth/authorize', requirePiLoginProvider('anthropic'))).toBe(true)
+    expect(isSafeAuthUrl(
+      'https://bigmodel.cn/coding-plan/personal/overview',
+      requirePiLoginProvider('zai-coding-cn'),
+    )).toBe(true)
     expect(isSafeAuthUrl('https://auth.x.ai/device', requirePiLoginProvider('openai-codex'))).toBe(false)
     expect(isSafeAuthUrl('http://auth.openai.com/oauth', requirePiLoginProvider('openai-codex'))).toBe(false)
     expect(isSafeAuthUrl('https://evil.example/login', requirePiLoginProvider('xai'))).toBe(false)
