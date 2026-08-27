@@ -105,9 +105,13 @@ asks you to paste the key into the local DSH page. The official endpoint is
 The plugin does not read BigModel cookies, browser storage, page content, or
 keys from another application. It sends the saved key only through Pi’s
 `zai-coding-cn` adapter when you select the `pi-zai-coding-cn` route.
-The route defaults to `glm-5.3-flash` and also keeps the older Coding Plan
-models visible. The plugin supplies GLM-5.3-Flash metadata until the installed
-Pi catalog includes it.
+Since 0.2.1, the list offers both standard `glm-5.3` (text-only) and
+`glm-5.3-flash` (text and images) as independent choices, without substituting
+one for the other. Flash remains the default; existing session selections and
+older Coding Plan models are preserved. The plugin supplies missing Pi catalog
+metadata: both models have a 1M context window and `low` / `high` / `max`
+reasoning, defaulting to `max`. See the
+[official model switching guide](https://docs.bigmodel.cn/cn/coding-plan/latest-model).
 
 ## Where credentials live
 

@@ -104,7 +104,7 @@ export const PI_LOGIN_PROVIDERS: readonly PiLoginProvider[] = [
     blurbZh: '智谱 GLM Coding Plan 中国区套餐，使用套餐页签发的专用 API Key。',
     allowedHosts: ['bigmodel.cn', 'www.bigmodel.cn', 'open.bigmodel.cn'],
     allowedSuffixes: ['.bigmodel.cn'],
-    preferredModels: ['glm-5.3-flash', 'glm-5.2', 'glm-5-turbo', 'glm-5.1', 'glm-4.7'],
+    preferredModels: ['glm-5.3-flash', 'glm-5.3', 'glm-5.2', 'glm-5-turbo', 'glm-5.1', 'glm-4.7'],
   },
 ]
 

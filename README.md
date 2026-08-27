@@ -99,8 +99,12 @@ Key 粘贴到本机 DSH 页面。官方接口为
 插件不会读取 BigModel Cookie、浏览器存储、网页内容，也不会从其他应用
 提取 Key。只有你选择 `pi-zai-coding-cn` 路由时，保存的 Key 才会交给 Pi 的
 `zai-coding-cn` 适配器发送。
-这条路由默认使用 `glm-5.3-flash`，同时保留 Coding Plan 的旧模型。当前
-Pi 目录尚未收录该模型，因此由插件补齐 GLM-5.3-Flash 的模型描述。
+从 0.2.1 起，模型列表同时提供 `glm-5.3` 普通版（纯文本）和
+`glm-5.3-flash`（文本与图片），两者可以独立选择，不会互相替换。
+默认仍为 Flash，已有会话的模型选择不变，也保留 Coding Plan 的旧模型。
+插件补齐尚未进入 Pi 目录的模型描述：两者均为 1M 上下文，支持
+`low` / `high` / `max` 思考强度，默认 `max`。详见
+[智谱官方模型切换说明](https://docs.bigmodel.cn/cn/coding-plan/latest-model)。
 
 ## 登录文件在哪
 

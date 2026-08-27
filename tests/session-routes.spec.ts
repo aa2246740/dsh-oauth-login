@@ -2,6 +2,7 @@ import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { createPiLoginAdapter } from '../src/adapter.ts'
 import { PiLoginCredentialStore } from '../src/store.ts'
 import { PiLoginSession } from '../src/session.ts'
 
@@ -67,7 +68,27 @@ describe('authenticated harness routes', () => {
       key: 'test-zhipu-plan-key',
     }))
     expect(await session.authenticatedRoutes()).toEqual(['pi-zai-coding-cn'])
+    expect(session.visibleModels('zai-coding-cn').map(model => model.id)).toContain('glm-5.3')
     expect(session.visibleModels('zai-coding-cn').map(model => model.id)).toContain('glm-5.3-flash')
     expect(session.visibleModels('zai-coding-cn').map(model => model.id)).toContain('glm-5.2')
+  })
+
+  it('resolves standard GLM-5.3 and Flash as distinct DSH model choices', async () => {
+    const session = await tempSession()
+    session.ensureTransport = async () => ({ source: 'direct' })
+    await session.store.modify('zai-coding-cn', async () => ({
+      type: 'api_key',
+      key: 'test-zhipu-plan-key',
+    }))
+    const adapter = createPiLoginAdapter(session, () => undefined)
+    const ids = (await adapter.listModels('pi-zai-coding-cn')).map(model => model.id)
+    for (const id of ['glm-5.3', 'glm-5.3-flash']) {
+      expect(ids.filter(candidate => candidate === id)).toHaveLength(1)
+      expect(await adapter.resolveModel('pi-zai-coding-cn', id)).toMatchObject({
+        id,
+        context: { contextWindow: 1_000_000 },
+        reasoning: { defaultEffort: 'max' },
+      })
+    }
   })
 })

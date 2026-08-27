@@ -1,7 +1,7 @@
 {
   "name": "dsh-oauth-login",
   "description": "DSH-owned subscription login powered by Pi AI adapters: OAuth plus official Plan API keys, with an independent credential store.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"

@@ -75,9 +75,27 @@ describe('Pi login catalog', () => {
     expect(zhipu.route).toBe('pi-zai-coding-cn')
     expect(catalogProvider(zhipu.id).auth.apiKey?.login).toBeTypeOf('function')
     const ids = harnessModels(zhipu).map(model => model.id)
+    expect(ids).toContain('glm-5.3')
     expect(ids).toContain('glm-5.3-flash')
     expect(ids).toContain('glm-5.2')
     expect(preferredModel(zhipu)).toBe('glm-5.3-flash')
+  })
+
+  it('publishes standard GLM-5.3 separately with its text-only Plan contract', () => {
+    const zhipu = piLoginProvider('zai-coding-cn')
+    if (zhipu === undefined) throw new Error('zai-coding-cn missing')
+    const standard = harnessModels(zhipu).find(model => model.id === 'glm-5.3')
+    if (standard === undefined) throw new Error('glm-5.3 missing')
+    expect(standard.name).toBe('GLM-5.3')
+    expect(standard.provider).toBe('pi-zai-coding-cn')
+    expect(standard.api).toBe('openai-completions')
+    expect(standard.baseUrl).toBe('https://open.bigmodel.cn/api/coding/paas/v4')
+    expect(standard.contextWindow).toBe(1_000_000)
+    expect(standard.maxTokens).toBe(131_072)
+    expect(standard.input).toEqual(['text'])
+    expect(getSupportedThinkingLevels(standard)).toEqual(['low', 'high', 'max'])
+    expect(defaultReasoningEffortFor(standard.id)).toBe('max')
+    expect(extraModelsFor('zai-coding-cn').some(model => model.id === standard.id)).toBe(true)
   })
 
   it('publishes GLM-5.3-Flash with its official multimodal and reasoning contract', () => {

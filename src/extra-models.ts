@@ -31,14 +31,17 @@ const XAI_EXTRA_MODELS: readonly Model<Api>[] = [
   },
 ]
 
-/** Latest Coding Plan model missing from the installed pi-ai catalog (0.82.x). */
+/** Latest Coding Plan models missing from the installed pi-ai catalog (0.82.x). */
+export const GLM_5_3_MODEL_ID = 'glm-5.3'
+export const GLM_5_3_DEFAULT_EFFORT = 'max'
 export const GLM_5_3_FLASH_MODEL_ID = 'glm-5.3-flash'
 export const GLM_5_3_FLASH_DEFAULT_EFFORT = 'max'
 
 /**
- * Official GLM-5.3-Flash metadata published on 2026-08-26.
- * Text limits and reasoning controls match GLM-5.3; the Flash variant also
- * accepts native image inputs.
+ * Official GLM-5.3 family metadata. Standard is text-only; Flash also accepts
+ * images. Keep separate IDs so choosing standard never routes to Flash.
+ * https://docs.bigmodel.cn/cn/guide/models/text/glm-5.3
+ * https://docs.bigmodel.cn/cn/coding-plan/latest-model
  */
 const ZAI_CODING_CN_EXTRA_MODELS: readonly Model<Api>[] = [
   {
@@ -49,6 +52,34 @@ const ZAI_CODING_CN_EXTRA_MODELS: readonly Model<Api>[] = [
     baseUrl: 'https://open.bigmodel.cn/api/coding/paas/v4',
     reasoning: true,
     input: ['text', 'image'],
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+    contextWindow: 1_000_000,
+    maxTokens: 131_072,
+    compat: {
+      supportsStore: false,
+      supportsDeveloperRole: false,
+      supportsReasoningEffort: true,
+      thinkingFormat: 'zai',
+      zaiToolStream: true,
+    },
+    thinkingLevelMap: {
+      off: null,
+      minimal: null,
+      low: 'low',
+      medium: null,
+      high: 'high',
+      xhigh: null,
+      max: 'max',
+    },
+  },
+  {
+    id: GLM_5_3_MODEL_ID,
+    name: 'GLM-5.3',
+    api: 'openai-completions',
+    provider: 'zai-coding-cn',
+    baseUrl: 'https://open.bigmodel.cn/api/coding/paas/v4',
+    reasoning: true,
+    input: ['text'],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: 1_000_000,
     maxTokens: 131_072,
@@ -117,8 +148,9 @@ const OPENROUTER_EXTRA_MODELS: readonly Model<Api>[] = [
 /** Per-model default the selector and request path should apply when omitted. */
 export function defaultReasoningEffortFor(
   modelId: string,
-): typeof OX_ALPHA_DEFAULT_EFFORT | typeof GLM_5_3_FLASH_DEFAULT_EFFORT | undefined {
+): typeof OX_ALPHA_DEFAULT_EFFORT | typeof GLM_5_3_DEFAULT_EFFORT | typeof GLM_5_3_FLASH_DEFAULT_EFFORT | undefined {
   if (modelId === OX_ALPHA_MODEL_ID) return OX_ALPHA_DEFAULT_EFFORT
+  if (modelId === GLM_5_3_MODEL_ID) return GLM_5_3_DEFAULT_EFFORT
   if (modelId === GLM_5_3_FLASH_MODEL_ID) return GLM_5_3_FLASH_DEFAULT_EFFORT
   return undefined
 }

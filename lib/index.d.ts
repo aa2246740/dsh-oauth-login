@@ -303,6 +303,7 @@ interface PiLoginAuthRouteOptions {
 declare function registerPiLoginAuthRoutes(ctx: Context$1, session: PiLoginSession, options?: PiLoginAuthRouteOptions): void;
 //#endregion
 //#region src/extra-models.d.ts
+declare const GLM_5_3_DEFAULT_EFFORT = "max";
 declare const GLM_5_3_FLASH_DEFAULT_EFFORT = "max";
 /** OpenRouter stealth model missing from the installed pi-ai catalog (0.82.x–0.84.x). */
 declare const OX_ALPHA_MODEL_ID = "stealth/ox-alpha";
@@ -314,7 +315,7 @@ declare const OX_ALPHA_MODEL_ID = "stealth/ox-alpha";
  */
 declare const OX_ALPHA_DEFAULT_EFFORT = "max";
 /** Per-model default the selector and request path should apply when omitted. */
-declare function defaultReasoningEffortFor(modelId: string): typeof OX_ALPHA_DEFAULT_EFFORT | typeof GLM_5_3_FLASH_DEFAULT_EFFORT | undefined;
+declare function defaultReasoningEffortFor(modelId: string): typeof OX_ALPHA_DEFAULT_EFFORT | typeof GLM_5_3_DEFAULT_EFFORT | typeof GLM_5_3_FLASH_DEFAULT_EFFORT | undefined;
 /**
  * Extra models this plugin publishes for one pi-ai provider id.
  * @param providerId - catalog provider id (e.g. `xai`), not the harness route.
