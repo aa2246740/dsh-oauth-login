@@ -19,6 +19,14 @@ access or refresh tokens, API keys, cookies, or the contents of
 - Stored credentials are restricted to the current operating-system user.
 - Local proxy candidates must pass a credential-free HTTP CONNECT probe before
   use. OAuth payloads remain protected by end-to-end TLS.
+- Explicit HTTP and WebSocket proxy settings apply only inside this plugin's
+  request scope. A disabled channel connects directly; a failed explicit proxy
+  does not silently fall back to direct access. Loopback callbacks bypass proxies.
+- The proxy settings API accepts same-origin, loopback requests on a literal
+  localhost/loopback Host, requires JSON for writes, and uses revision checks.
+  URLs containing proxy credentials, paths, queries, or fragments are rejected.
+  Settings are written atomically with mode 0600 to a separate file; the OAuth
+  credential document is not modified. TLS verification is never disabled.
 - Authorization URLs are restricted to the provider hosts declared by the
   installed Pi AI provider catalog.
 

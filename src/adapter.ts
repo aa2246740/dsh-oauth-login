@@ -90,10 +90,13 @@ class PiLoginAdapter extends PiAiAdapter {
   }
 
   override async prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedAdapterCall> {
-    const prepared = await super.prepareCall(provider, model, signal)
+    const prepared = await this.session.proxy.run(() => super.prepareCall(provider, model, signal))
     return {
       ...prepared,
-      stream: options => withFailureHints(prepared.stream(options), provider),
+      stream: options => withFailureHints(this.session.proxy.iterate(
+        prepared.stream(options),
+        provider === 'pi-openai-codex' && options.sessionId !== undefined ? String(options.sessionId) : undefined,
+      ), provider),
     }
   }
 
@@ -108,7 +111,10 @@ class PiLoginAdapter extends PiAiAdapter {
         : {},
     }
     try {
-      const raw = iterateInCapture(capture, super.stream(sanitized))
+      const raw = iterateInCapture(capture, this.session.proxy.iterate(
+        super.stream(sanitized),
+        sanitized.provider === 'pi-openai-codex' && sanitized.sessionId !== undefined ? String(sanitized.sessionId) : undefined,
+      ))
       const plan = this.native.enabled ? nativePlanForRoute(sanitized.provider, this.native) : undefined
       const filtered = plan === undefined ? raw : filterHostedServerToolTraces(raw)
       const attachments = this.native.image ? this.resolveAttachments() : undefined

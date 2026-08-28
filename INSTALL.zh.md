@@ -23,7 +23,7 @@ dsh plugin --profile web exec dsh-oauth-login logout openai-codex
 智谱 GLM Coding Plan 会打开官方套餐页，再在本机提示你输入 API Key；
 插件不会读取你的浏览器登录状态。
 
-插件会先使用 DSH 已继承的代理变量，再检查 `DSH_OAUTH_PROXY`、可连接的 macOS 系统代理以及通过验证的本机 HTTP CONNECT 代理，最后才回退到直连；不会添加任何地区信息。代理应用或设置改变后请重启 `dsh web`。
+升级服务端插件后先重启一次 DSH，再进入「设置 → 订阅登录 → 网络代理」。HTTP 与 WebSocket 可以独立配置，地址默认填入 `http://127.0.0.1`，端口留空。开启并填写端口时优先使用该代理；默认地址且端口留空时沿用自动发现，不会默认使用 80 端口；关闭时直接连接。请使用 HTTP(S) CONNECT / 混合代理端口，不能填纯 SOCKS 端口。页面保存后用于新请求，不需要再次重启；改变启动时继承的环境变量则需要重启。详见[网络代理与恢复机制](docs/network-proxy.md)。
 
 卸载：
 

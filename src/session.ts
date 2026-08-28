@@ -5,8 +5,9 @@ import { createModels } from '@earendil-works/pi-ai'
 import type { MutableModels } from '@earendil-works/pi-ai'
 import { PI_LOGIN_PROVIDERS, piLoginProvider } from './catalog.ts'
 import type { PiLoginProvider } from './catalog.ts'
-import { configureOAuthHttpTransport } from './http.ts'
-import type { OAuthProxyResolution } from './http.ts'
+import type { OAuthProxyDiscoveryOptions, OAuthProxyResolution } from './http.ts'
+import { PROXY_SETTINGS_FILENAME } from './proxy-config.ts'
+import { OAuthProxyTransport } from './proxy-transport.ts'
 import {
   grantNeedsRefresh,
   markRefreshAttempt,
@@ -26,21 +27,24 @@ export class PiLoginSession {
   readonly models: MutableModels
   readonly native: NativeToolPolicy
   readonly openRouter: OpenRouterCatalog
-  private transportPromise?: Promise<OAuthProxyResolution>
+  readonly proxy: OAuthProxyTransport
 
   constructor(
     store: PiLoginCredentialStore = new PiLoginCredentialStore(),
     native: NativeToolPolicy = DEFAULT_NATIVE_TOOL_POLICY,
     catalogOptions: Partial<Pick<OpenRouterCatalogOptions, 'fetch' | 'now' | 'filename'>> = {},
+    proxyDiscovery: OAuthProxyDiscoveryOptions = {},
   ) {
     this.store = store
     this.native = native
+    this.proxy = new OAuthProxyTransport(join(dirname(store.filename), PROXY_SETTINGS_FILENAME), proxyDiscovery)
     this.models = createModels({ credentials: store })
     for (const provider of allCatalogProviders()) this.models.setProvider(provider)
     this.openRouter = new OpenRouterCatalog({
       filename: join(dirname(store.filename), OPENROUTER_CACHE_FILENAME),
       isAuthenticated: async () => (await store.list()).some(item => item.providerId === 'openrouter'),
       beforeFetch: () => this.ensureTransport(),
+      fetch: (input, init) => this.proxy.run(() => fetch(input, init)),
       initiallyProtectedIds: harnessModels(this.spec('openrouter'))
         .filter(model => model.cost.input === 0 && model.cost.output === 0)
         .map(model => model.id),
@@ -49,14 +53,7 @@ export class PiLoginSession {
   }
 
   ensureTransport(): Promise<OAuthProxyResolution> {
-    if (this.transportPromise !== undefined) return this.transportPromise
-
-    const pending = configureOAuthHttpTransport()
-    this.transportPromise = pending
-    void pending.catch(() => {
-      if (this.transportPromise === pending) this.transportPromise = undefined
-    })
-    return pending
+    return this.proxy.initialize()
   }
 
   spec(id: string): PiLoginProvider {
@@ -101,7 +98,7 @@ export class PiLoginSession {
       const key = refreshAttemptKey(this.store.filename, providerId)
       if (refreshOnCooldown(key, now)) continue
       markRefreshAttempt(key, now)
-      await refreshGrant(id => this.models.getAuth(id), providerId)
+      await this.proxy.run(() => refreshGrant(id => this.models.getAuth(id), providerId))
     }
   }
 }

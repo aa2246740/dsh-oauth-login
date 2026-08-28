@@ -10,6 +10,8 @@ import type { PiLoginProvider } from './catalog.ts'
 import { isSafeAuthUrl, safeMessage } from './redact.ts'
 import type { PiLoginSession } from './session.ts'
 import { OPENROUTER_CATALOG_PATH, OPENROUTER_REFRESH_PATH } from './openrouter-types.ts'
+import { parseProxySettings, PROXY_SETTINGS_PATH } from './proxy-config.ts'
+import { ProxySettingsConflict } from './proxy-store.ts'
 
 export const PI_LOGIN_AUTH_STATUS_PATH = '/plugins/dsh-oauth-login/auth/status'
 export const PI_LOGIN_AUTH_LOGIN_PATH = '/plugins/dsh-oauth-login/auth/login'
@@ -352,6 +354,16 @@ function trustedRequest(req: IncomingMessage): boolean {
   }
 }
 
+function trustedProxyRequest(req: IncomingMessage): boolean {
+  if (!trustedRequest(req)) return false
+  // A proxy endpoint controls where credentials travel. Reject a rebound
+  // public hostname even when its connection happens to originate on loopback.
+  try {
+    const host = new URL(`http://${req.headers.host}`).hostname
+    return host === 'localhost' || host === '127.0.0.1' || host === '[::1]'
+  } catch { return false }
+}
+
 function json(res: ServerResponse, status: number, value: unknown): void {
   res.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
@@ -413,6 +425,30 @@ export function registerPiLoginAuthRoutes(
   }
   ctx.effect(() => {
     const routes = [
+      ctx.webServer.register({
+        kind: 'exact',
+        path: PROXY_SETTINGS_PATH,
+        handler: async (req, res) => {
+          if (!trustedProxyRequest(req)) return json(res, 403, { error: 'forbidden' })
+          if (req.method === 'GET') {
+            try { return json(res, 200, await session.proxy.settings.read()) } catch {
+              return json(res, 503, { error: 'Network settings could not be read' })
+            }
+          }
+          if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
+          if (req.headers['content-type']?.split(';')[0]?.trim() !== 'application/json') {
+            return json(res, 415, { error: 'application/json required' })
+          }
+          let settings
+          try { settings = parseProxySettings(await readJson(req)) } catch {
+            return json(res, 400, { error: 'Invalid network settings: use HTTP(S) proxy URLs without credentials or paths' })
+          }
+          try { json(res, 200, await session.proxy.save(settings)) } catch (error) {
+            if (error instanceof ProxySettingsConflict) return json(res, 409, { error: error.message })
+            json(res, 503, { error: 'Network settings could not be saved' })
+          }
+        },
+      }),
       ctx.webServer.register({
         kind: 'exact',
         path: OPENROUTER_CATALOG_PATH,

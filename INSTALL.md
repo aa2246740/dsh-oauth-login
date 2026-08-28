@@ -25,10 +25,15 @@ dsh plugin --profile web exec dsh-oauth-login logout openai-codex
 For Zhipu GLM Coding Plan, the command opens the official Plan page and asks
 for its API key locally. The plugin never reads your browser session.
 
-The plugin automatically honors inherited proxy variables, then checks
-`DSH_OAUTH_PROXY`, the reachable macOS system proxy, and verified local HTTP
-CONNECT proxies before falling back to direct access. It never adds geographic
-metadata. Restart `dsh web` after changing proxy applications or settings.
+After upgrading the server plugin and restarting DSH once, open Settings →
+Subscription Login → Network proxy. Configure HTTP and WebSocket independently.
+The address defaults to `http://127.0.0.1`, with the port left empty. An enabled
+channel with an explicit address and port overrides automatic discovery; an
+enabled channel with the default address and no port preserves it without
+implicitly selecting port 80; a disabled channel connects
+directly. Use an HTTP(S) CONNECT or mixed proxy, not a SOCKS-only port. UI saves
+apply to new requests without another restart. Restart DSH when changing the
+environment variables inherited at launch. See [details](docs/network-proxy.md).
 
 Uninstall:
 

@@ -11,7 +11,9 @@ import { PiLoginSession } from '../src/session.ts'
 
 async function tempSession(): Promise<PiLoginSession> {
   const dir = await mkdtemp(join(tmpdir(), 'dsh-pi-login-session-'))
-  return new PiLoginSession(new PiLoginCredentialStore(join(dir, 'auth.json')))
+  return new PiLoginSession(new PiLoginCredentialStore(join(dir, 'auth.json')), undefined, undefined, {
+    env: {}, platform: 'linux', candidates: [],
+  })
 }
 
 describe('authenticated harness routes', () => {
@@ -98,6 +100,10 @@ describe('authenticated harness routes', () => {
 
 describe('provider recovery at the subscription adapter boundary', () => {
   const cases = [
+    {
+      provider: 'pi-openai-codex', model: 'gpt-5.6-sol', code: 'PI_AI_ERROR', expected: 'TRANSPORT',
+      message: 'WebSocket error',
+    },
     {
       provider: 'pi-openai-codex', model: 'gpt-5.6-sol', code: 'PI_AI_ERROR', expected: 'SERVER',
       message: 'Codex error: Our servers are currently overloaded. Please try again later.',

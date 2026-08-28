@@ -93,6 +93,31 @@ describe('provider failure recovery compatibility', () => {
     expect(hintFailure(failure, 'pi-openai-codex')).toBe(failure)
   })
 
+  it.each([
+    'WebSocket error',
+    'WebSocket closed 1006',
+    'WebSocket closed 1001 going away',
+    'WebSocket closed 1011 internal error',
+    'WebSocket closed 1012 service restart',
+    'WebSocket closed 1013 try again later',
+  ])('lets the existing recovery policy handle a Codex transport failure: %s', (message) => {
+    const failure = hintFailure({ message, code: 'PI_AI_ERROR' }, 'pi-openai-codex')
+    expect(failure.code).toBe('TRANSPORT')
+    expect(policy.retryableCodes).toContain(failure.code)
+    expect(failure.message).toContain(message)
+    expect(hintFailure(failure, 'pi-openai-codex')).toBe(failure)
+  })
+
+  it.each([
+    'WebSocket closed 1008 policy violation',
+    'WebSocket closed 1009 message too big',
+    'WebSocket closed 1002 protocol error',
+    'Unknown WebSocket error in request',
+  ])('does not reinterpret a policy, size, protocol or unknown failure: %s', (message) => {
+    const failure = { message, code: 'PI_AI_ERROR' }
+    expect(hintFailure(failure, 'pi-openai-codex')).toBe(failure)
+  })
+
   it.each(['1310', 1310])('does not retry Zhipu quota code %s as peak traffic', (code) => {
     const message = `429: ${JSON.stringify({ code, message: '您已达到每周/每月使用上限' })}`
     const failure = hintFailure({ message, code: 'RATE_LIMIT', status: 429 }, 'pi-zai-coding-cn')

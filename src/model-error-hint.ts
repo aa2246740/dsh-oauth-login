@@ -53,6 +53,13 @@ function isZhipuPlanQuota(message: string): boolean {
 
 /** Repair only observed route-specific classification gaps; keep all other official codes. */
 function providerFailure(failure: LlmFailure, provider: string | undefined): LlmFailure {
+  // The upstream word-boundary matcher recognizes "socket" but misses
+  // "WebSocket". Keep policy/protocol/size failures out of this narrow repair.
+  if (provider === 'pi-openai-codex' && failure.code === 'PI_AI_ERROR'
+    && (/^WebSocket error$/i.test(failure.message.trim())
+      || /^WebSocket closed (?:1000|1001|1005|1006|1011|1012|1013)(?:\s|$)/i.test(failure.message.trim()))) {
+    return { ...failure, code: 'TRANSPORT' }
+  }
   if (provider === 'pi-openai-codex' && failure.code === 'PI_AI_ERROR'
     && /\b(?:servers?|engine)\s+(?:are|is)\s+(?:currently\s+)?overloaded\b/i.test(failure.message)) {
     return { ...failure, code: 'SERVER' }

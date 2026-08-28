@@ -1,7 +1,7 @@
 {
   "name": "dsh-oauth-login",
   "description": "DSH-owned subscription login powered by Pi AI adapters: OAuth plus official Plan API keys, with an independent credential store.",
-  "version": "0.2.2-rc.1",
+  "version": "0.2.3-rc.1",
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
@@ -64,7 +64,8 @@
     "SECURITY.md",
     "LICENSE",
     "docs/screenshots",
-    "docs/openrouter-sync.md"
+    "docs/openrouter-sync.md",
+    "docs/network-proxy.md"
   ],
   "license": "Apache-2.0",
   "dependencies": {

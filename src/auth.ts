@@ -1,9 +1,11 @@
 /** DSH-owned models.login() for every subscribed provider in the catalog. */
 
 import { createModels } from '@earendil-works/pi-ai'
+import { dirname, join } from 'node:path'
 import type { AuthInteraction } from '@earendil-works/pi-ai'
 import { requirePiLoginProvider } from './catalog.ts'
-import { configureOAuthHttpTransport } from './http.ts'
+import { OAuthProxyTransport } from './proxy-transport.ts'
+import { PROXY_SETTINGS_FILENAME } from './proxy-config.ts'
 import { catalogProvider } from './provider.ts'
 import type { PiLoginSession } from './session.ts'
 import { PiLoginCredentialStore } from './store.ts'
@@ -21,10 +23,10 @@ export async function loginPiProvider(
   store: PiLoginCredentialStore = new PiLoginCredentialStore(),
 ): Promise<void> {
   const spec = requirePiLoginProvider(providerId)
-  await configureOAuthHttpTransport()
   const models = createModels({ credentials: store })
   models.setProvider(catalogProvider(providerId))
-  await models.login(providerId, spec.authType, interaction)
+  const proxy = new OAuthProxyTransport(join(dirname(store.filename), PROXY_SETTINGS_FILENAME))
+  try { await proxy.run(() => models.login(providerId, spec.authType, interaction)) } finally { await proxy.dispose() }
 }
 
 export async function logoutPiProvider(
@@ -69,6 +71,6 @@ export async function loginPiProviderSession(
   const spec = requirePiLoginProvider(providerId)
   await session.ensureTransport()
   session.models.setProvider(catalogProvider(providerId))
-  await session.models.login(providerId, spec.authType, interaction)
+  await session.proxy.run(() => session.models.login(providerId, spec.authType, interaction))
   if (providerId === 'openrouter') await session.openRouter.syncAuthentication('login')
 }

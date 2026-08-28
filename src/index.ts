@@ -150,9 +150,10 @@ export function apply(ctx: Context, config: Config): void {
     void session.openRouter.syncAuthentication().catch(() => {
       console.warn('[dsh-oauth-login] OpenRouter catalog initialization failed; keeping built-in models')
     })
-    return () => {
+    return async () => {
       stop()
       session.openRouter.dispose()
+      await session.proxy.dispose()
     }
   }, 'dsh-oauth-login: OpenRouter catalog')
   ctx.effect(() => {

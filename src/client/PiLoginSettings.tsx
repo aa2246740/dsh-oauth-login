@@ -6,6 +6,7 @@ import type { Drafts } from './draft-input.ts'
 import type { PiLoginKey } from './locales.ts'
 import type { OpenRouterCatalogClient } from './openrouter-store.ts'
 import { OpenRouterSyncStatus } from './OpenRouterSyncStatus.tsx'
+import { ProxySettings } from './ProxySettings.tsx'
 
 const STATUS_PATH = '/plugins/dsh-oauth-login/auth/status'
 const LOGIN_PATH = '/plugins/dsh-oauth-login/auth/login'
@@ -117,6 +118,16 @@ const SETTINGS_CSS = `
   border-color:var(--dsw-alias-brand-primary);
 }
 .dsh-pi-login-actions { display:flex; justify-content:flex-end; }
+.dsh-oauth-proxy-channel { min-width:0; margin:8px 0 0; padding:12px 0 0; border:0; border-top:1px solid var(--dsw-alias-border-l2); display:flex; flex-direction:column; gap:8px; }
+.dsh-oauth-proxy-channel legend { padding:0 8px 0 0; font-size:13px; }
+.dsh-oauth-proxy-switch { display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer; }
+.dsh-oauth-proxy-switch input { width:16px; height:16px; margin:0; accent-color:var(--dsw-alias-brand-primary); }
+.dsh-oauth-proxy-fields { display:grid; grid-template-columns:minmax(0, 1fr) 100px; gap:12px; }
+.dsh-oauth-proxy-fields label { min-width:0; display:flex; flex-direction:column; gap:6px; font-size:12px; }
+.dsh-oauth-proxy-fields input { font-size:13px; }
+.dsh-oauth-proxy-fields input:disabled { opacity:0.55; }
+.dsh-oauth-proxy-actions { justify-content:flex-end; }
+@media (max-width:360px) { .dsh-oauth-proxy-fields { grid-template-columns:minmax(0, 1fr); } }
 `
 
 function ensureThemeStyles(): void {
@@ -225,6 +236,7 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
   return (
     <section className="dsh-pi-login-page" aria-labelledby="pi-login-settings-title">
       <h2 id="pi-login-settings-title" className="dsh-pi-login-title">{t('title')}</h2>
+      <ProxySettings t={t} />
       {error !== undefined ? <p className="dsh-pi-login-error">{error}</p> : null}
       {providers === undefined
         ? <p className="dsh-pi-login-body">{t('loadingAccount')}</p>

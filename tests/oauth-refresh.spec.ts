@@ -37,7 +37,9 @@ describe('refreshGrant', () => {
 describe('PiLoginSession.refreshStoredGrants', () => {
   async function sessionWithXai(expires: number): Promise<PiLoginSession> {
     const dir = await mkdtemp(join(tmpdir(), 'dsh-oauth-refresh-'))
-    const session = new PiLoginSession(new PiLoginCredentialStore(join(dir, 'auth.json')))
+    const session = new PiLoginSession(new PiLoginCredentialStore(join(dir, 'auth.json')), undefined, undefined, {
+      env: {}, platform: 'linux', candidates: [],
+    })
     await session.store.modify('xai', async () => ({
       type: 'oauth',
       access: 'xai-access',

@@ -148,7 +148,7 @@ To keep DSH's own search tool:
 
 ## When the model fails
 
-This plugin uses official `dsh-llm-retry` budgets, backoff, and cancellation. Before appending a hint, it repairs two confirmed classification gaps: server-overloaded text on the Codex route changes from `PI_AI_ERROR` to `SERVER`, and HTTP 429 with business code `1310` on the Zhipu China Coding Plan route changes from `RATE_LIMIT` to `QUOTA`. Terminal stream failures and thrown errors use the same rules. Other routes and already classified errors retain their codes.
+This plugin uses official `dsh-llm-retry` budgets, backoff, and cancellation. It repairs confirmed classification gaps: Codex `WebSocket error` and known recoverable close codes become `TRANSPORT`, server-overloaded text becomes `SERVER`, and HTTP 429 with business code `1310` on the Zhipu China Coding Plan route becomes `QUOTA`. Terminal stream failures and thrown errors use the same rules. Other routes and already classified errors retain their codes.
 
 Agent requests use `prepareCall` to capture model and provider state; direct streaming consumers use `stream`. Both paths apply the compatibility rules. Prepared requests retain the original `prepared.stream` rather than reselecting the provider or losing the captured request state.
 
@@ -156,13 +156,15 @@ Agent requests use `prepareCall` to capture model and provider state; direct str
 |---|---|---|
 | `RATE_LIMIT` | Request-rate or peak busy. Many HTTP 429s land here. | Wait out the five automatic retries, then send another message. |
 | `QUOTA` | Plan, usage window, or balance. | Retry will not refill it. Check the provider plan. |
-| `TIMEOUT` / `TRANSPORT` | Idle stream or network. | Send another message after the turn ends. |
+| `TIMEOUT` / `TRANSPORT` | Idle stream or network. | Let the existing recovery budget run; check the network if it is exhausted. |
 | `SERVER` | Provider 5xx / some overloaded responses. | Same as other transient codes. |
 | `AUTH` / `MISSING_CREDENTIAL` | Grant or Plan key missing or rejected. | Settings → Subscription Login. Chat may show AUTH as "API key is invalid". |
 
 A 429 does not by itself distinguish peak traffic from depleted quota. Zhipu code `1305` remains retryable `RATE_LIMIT`; code `1310` becomes `QUOTA`, stopping short automatic retries and showing the quota hint. This compatibility rule only reads the top-level business code in that route's error JSON, never request examples, nested fields, or ambiguous text.
 
 On RC8 the default budget is five automatic retries for the transient codes above. After that the turn ends. If Continue fails or the composer stays stuck, start a new chat.
+
+There is no separate WS retry limit. Pi AI 0.82.1 may fall back to SSE inside the same call when WS fails before its first event. A transport failure after the first event latches SSE for the same session, allowing the next Harness retry to continue over HTTP. The original session ID and retry limits remain unchanged. The plugin never delays an available SSE fallback to force five WS failures.
 
 To raise the budget without editing plugin code, patch the `llm-oauth-login` row:
 
@@ -183,9 +185,15 @@ To raise the budget without editing plugin code, patch the `llm-oauth-login` row
 
 ## Proxy
 
-OAuth and subscribed-provider requests use the first available route in this order: inherited `HTTP_PROXY`, `HTTPS_PROXY`, or `ALL_PROXY`; the plugin-only `DSH_OAUTH_PROXY` override; an enabled and reachable macOS system HTTP/HTTPS proxy; a verified HTTP CONNECT proxy on a common loopback port; then direct access.
+Open **Settings → Subscription Login → Network proxy**. HTTP and WebSocket each have their own enable switch, address, and port. The address is prefilled with `http://127.0.0.1`; the port is left empty for the user. Settings only affect this plugin's requests, without editing DSH core, dependency sources, system proxy settings, or environment variables.
 
-Loopback candidates are accepted only after a credential-free CONNECT probe. The plugin does not add country, region, locale, or other geographic metadata. To force a proxy, start DSH with `DSH_OAUTH_PROXY=http://127.0.0.1:45678`. Restart `dsh web` after changing proxy applications or settings.
+Enabled with an address and port uses that HTTP(S) CONNECT proxy in preference to environment/system settings, with no silent direct fallback. Disabled forces direct connections while retaining the saved address. Enabled with the default address and no port preserves automatic discovery: inherited proxy variables, `DSH_OAUTH_PROXY`, a reachable macOS system proxy, verified loopback candidates, then direct access. An empty port never implicitly selects port 80. Clearing both fields also preserves automatic discovery.
+
+For an HTTP or mixed proxy listening on port 45678, enable both channels and enter address `http://127.0.0.1`, port `45678`. SOCKS-only ports are not supported by these controls. The WS switch controls proxy routing, not whether WebSocket itself is enabled. SSE fallback uses the HTTP setting.
+
+Saved settings apply to new requests without interrupting a running call. A changed WS proxy retires the old cached connection without erasing the session's SSE fallback latch. Upgrading the server plugin still needs a DSH restart; later UI saves do not. Correct routing can reduce connection failures but cannot prevent every proxy or provider outage.
+
+Settings are stored in a separate `.dsh-oauth-proxy.json` beside the credential file. See [network proxy and recovery details](docs/network-proxy.md).
 
 ## License
 

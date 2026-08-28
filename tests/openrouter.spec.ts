@@ -229,7 +229,7 @@ describe('Host-owned OpenRouter sync', () => {
       fetch: vi.fn<typeof globalThis.fetch>().mockImplementation(async () => response([
         { ...row('minimax/minimax-m2.7:free'), reasoning: { mandatory: true } },
       ])),
-    })
+    }, { env: {}, platform: 'linux', candidates: [] })
     catalogs.push(session.openRouter)
     session.ensureTransport = async () => ({ source: 'direct' })
     await session.store.modify('openrouter', async () => ({ type: 'api_key', key: 'test-not-a-real-key' }))
@@ -315,7 +315,7 @@ describe('free-only outbound payload', () => {
     vi.stubGlobal('fetch', fetch)
     const session = new PiLoginSession(new PiLoginCredentialStore(join(await tempDir(), 'auth.json')), undefined, {
       fetch: vi.fn<typeof globalThis.fetch>().mockImplementation(async () => response()),
-    })
+    }, { env: {}, platform: 'linux', candidates: [] })
     catalogs.push(session.openRouter)
     session.ensureTransport = async () => ({ source: 'direct' })
     await session.store.modify('openrouter', async () => ({ type: 'api_key', key: 'test-only-key' }))

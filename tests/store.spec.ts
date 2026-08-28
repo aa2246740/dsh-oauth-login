@@ -1,8 +1,10 @@
-import { chmod, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { chmod, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { PiLoginCredentialStore } from '../src/store.ts'
+import { ProxySettingsConflict, ProxySettingsStore } from '../src/proxy-store.ts'
+import { defaultProxySettings } from '../src/proxy-config.ts'
 
 async function tempStore(): Promise<PiLoginCredentialStore> {
   const dir = await mkdtemp(join(tmpdir(), 'dsh-pi-login-'))
@@ -103,5 +105,47 @@ describe('PiLoginCredentialStore', () => {
     await store.delete('xai')
     expect(await store.read('xai')).toBeUndefined()
     expect(await store.list()).toEqual([])
+  })
+})
+
+describe('independent proxy settings store', () => {
+  it('persists both channels atomically without touching credentials', async () => {
+    const auth = await tempStore()
+    await auth.modify('openai-codex', async () => ({ type: 'oauth', access: 'test-access', refresh: 'test-refresh', expires: 1 }))
+    const before = await readFile(auth.filename)
+    const store = new ProxySettingsStore(join(auth.filename, '..', '.dsh-oauth-proxy.json'))
+    expect(await store.read()).toEqual(defaultProxySettings())
+    const saved = await store.save({
+      revision: 0,
+      http: { enabled: false, url: 'http://127.0.0.1:45678/' },
+      websocket: { enabled: true, url: 'http://127.0.0.1:7890' },
+    })
+    expect(saved.http).toEqual({ enabled: false, url: 'http://127.0.0.1:45678' })
+    expect(saved.revision).toBe(1)
+    expect(await new ProxySettingsStore(store.filename).read()).toEqual(saved)
+    expect((await stat(store.filename)).mode & 0o777).toBe(0o600)
+    expect(await readFile(auth.filename)).toEqual(before)
+    await expect(store.save({ ...saved, revision: 0 })).rejects.toBeInstanceOf(ProxySettingsConflict)
+    expect(await store.read()).toEqual(saved)
+  })
+
+  it.each([
+    'socks5://127.0.0.1:45678', 'http://user:secret@127.0.0.1:45678',
+    'http://127.0.0.1:45678/path', 'http://127.0.0.1:45678/?token=secret',
+    'http://127.0.0.1:0', 'http://127.0.0.1:65536',
+  ])('rejects invalid proxy URLs without saving: %s', async url => {
+    const auth = await tempStore()
+    const store = new ProxySettingsStore(join(auth.filename, '..', 'proxy.json'))
+    await expect(store.save({ ...defaultProxySettings(), websocket: { enabled: true, url } })).rejects.toThrow()
+    expect(await store.read()).toEqual(defaultProxySettings())
+  })
+
+  it('does not silently fall back to direct traffic when persisted settings are corrupted', async () => {
+    const auth = await tempStore()
+    const store = new ProxySettingsStore(join(auth.filename, '..', 'proxy.json'))
+    await writeFile(store.filename, '{invalid')
+    await expect(store.read()).rejects.toThrow(/valid JSON/)
+    await expect(store.save(defaultProxySettings())).rejects.toThrow(/valid JSON/)
+    expect(await readFile(store.filename, 'utf8')).toBe('{invalid')
   })
 })

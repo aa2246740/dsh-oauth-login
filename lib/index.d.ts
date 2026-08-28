@@ -2,6 +2,7 @@ import { LlmFailure, Message, RetryPolicyConfig, StreamChunk } from "@deepseek-a
 import { Api, AuthInteraction, Context, Credential, CredentialInfo, CredentialStore, Model, MutableModels, Provider, StreamOptions } from "@earendil-works/pi-ai";
 import { PiAiAdapter } from "@deepseek-ai/dsh-llm-pi-ai";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { EnvHttpProxyAgent } from "undici";
 import z from "@deepseek-ai/schemastery";
 import { Context as Context$1 } from "@deepseek-ai/cordis";
 import { AttachmentStore, ImageAttachmentRef, ImageMediaType, SaveImageAttachment } from "@deepseek-ai/dsh-attachment";
@@ -50,7 +51,6 @@ declare function piLoginProvider(id: string): PiLoginProvider | undefined;
 declare function piLoginRoutes(): string[];
 //#endregion
 //#region src/http.d.ts
-/** Proxy-aware HTTP transport for OAuth and subscribed-provider requests. */
 type OAuthProxyResolution = {
   source: 'environment';
 } | {
@@ -59,6 +59,57 @@ type OAuthProxyResolution = {
 } | {
   source: 'direct';
 };
+interface OAuthProxyDiscoveryOptions {
+  env?: NodeJS.ProcessEnv;
+  platform?: NodeJS.Platform;
+  readSystemProxy?: () => Promise<string | undefined>;
+  probe?: (proxyUrl: string) => Promise<boolean>;
+  candidates?: readonly string[];
+}
+//#endregion
+//#region src/proxy-config.d.ts
+interface ProxyChannelSettings {
+  /** False means direct, even when proxy environment variables are set. */
+  enabled: boolean;
+  /** Empty keeps environment/system discovery; otherwise this URL wins. */
+  url: string;
+}
+interface ProxySettings {
+  http: ProxyChannelSettings;
+  websocket: ProxyChannelSettings;
+}
+interface ProxySettingsSnapshot extends ProxySettings {
+  revision: number;
+}
+//#endregion
+//#region src/proxy-store.d.ts
+declare class ProxySettingsStore {
+  readonly filename: string;
+  constructor(filename: string);
+  read(): Promise<ProxySettingsSnapshot>;
+  save(value: unknown): Promise<ProxySettingsSnapshot>;
+}
+//#endregion
+//#region src/proxy-transport.d.ts
+declare class OAuthProxyTransport {
+  private readonly discovery;
+  readonly settings: ProxySettingsStore;
+  private readyPromise?;
+  private readonly generations;
+  private readonly sessions;
+  private disposed;
+  constructor(filename: string, discovery?: OAuthProxyDiscoveryOptions);
+  private build;
+  private ready;
+  initialize(): Promise<OAuthProxyResolution>;
+  private acquire;
+  save(value: unknown): Promise<ProxySettingsSnapshot>;
+  private release;
+  run<T>(operation: () => Promise<T>): Promise<T>;
+  private beginSession;
+  iterate<T>(source: AsyncIterable<T>, codexSessionId?: string): AsyncIterable<T>;
+  dispose(): Promise<void>;
+}
 //#endregion
 //#region src/native-tools.d.ts
 interface NativeToolPolicy {
@@ -217,8 +268,8 @@ declare class PiLoginSession {
   readonly models: MutableModels;
   readonly native: NativeToolPolicy;
   readonly openRouter: OpenRouterCatalog;
-  private transportPromise?;
-  constructor(store?: PiLoginCredentialStore, native?: NativeToolPolicy, catalogOptions?: Partial<Pick<OpenRouterCatalogOptions, 'fetch' | 'now' | 'filename'>>);
+  readonly proxy: OAuthProxyTransport;
+  constructor(store?: PiLoginCredentialStore, native?: NativeToolPolicy, catalogOptions?: Partial<Pick<OpenRouterCatalogOptions, 'fetch' | 'now' | 'filename'>>, proxyDiscovery?: OAuthProxyDiscoveryOptions);
   ensureTransport(): Promise<OAuthProxyResolution>;
   spec(id: string): PiLoginProvider;
   provider(id: string): import("@earendil-works/pi-ai").Provider<import("@earendil-works/pi-ai").Api>;

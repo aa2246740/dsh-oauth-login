@@ -204,9 +204,9 @@ function inheritedProxyOptions(env: NodeJS.ProcessEnv): { httpProxy: string, htt
   }
 }
 
-export async function configureOAuthHttpTransport(
+export async function createOAuthHttpTransport(
   options: OAuthProxyDiscoveryOptions = {},
-): Promise<OAuthProxyResolution> {
+): Promise<{ dispatcher: EnvHttpProxyAgent; resolution: OAuthProxyResolution }> {
   const env = options.env ?? process.env
   const resolution = await resolveOAuthProxy({ ...options, env })
   const selectedProxy = 'proxyUrl' in resolution ? resolution.proxyUrl : undefined
@@ -217,8 +217,10 @@ export async function configureOAuthHttpTransport(
     httpsProxy: selectedProxy ?? inherited.httpsProxy,
     noProxy: noProxyValue(env),
   })
-  setGlobalDispatcher(dispatcher)
+  return { dispatcher, resolution }
+}
 
+export function installOAuthHttpGlobals(): void {
   const shouldInstallFetch = installedFetch === undefined
     ? globalThis.fetch === originalFetch
     : globalThis.fetch === installedFetch
@@ -227,5 +229,13 @@ export async function configureOAuthHttpTransport(
     installedFetch = globalThis.fetch
   }
   installHostedOutputFetch()
+}
+
+export async function configureOAuthHttpTransport(
+  options: OAuthProxyDiscoveryOptions = {},
+): Promise<OAuthProxyResolution> {
+  const { dispatcher, resolution } = await createOAuthHttpTransport(options)
+  setGlobalDispatcher(dispatcher)
+  installOAuthHttpGlobals()
   return resolution
 }

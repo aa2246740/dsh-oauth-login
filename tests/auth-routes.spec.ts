@@ -8,7 +8,9 @@ import { PiLoginCredentialStore } from '../src/store.ts'
 
 async function tempSession(): Promise<PiLoginSession> {
   const dir = await mkdtemp(join(tmpdir(), 'dsh-pi-login-web-auth-'))
-  const session = new PiLoginSession(new PiLoginCredentialStore(join(dir, 'auth.json')))
+  const session = new PiLoginSession(new PiLoginCredentialStore(join(dir, 'auth.json')), undefined, undefined, {
+    env: {}, platform: 'linux', candidates: [],
+  })
   session.ensureTransport = async () => ({ source: 'direct' })
   return session
 }
