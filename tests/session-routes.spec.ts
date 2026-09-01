@@ -149,4 +149,57 @@ describe('provider recovery at the subscription adapter boundary', () => {
       preparedUpstream.mockRestore()
     }
   })
+
+  it('drops Grok hosted X Search on prepareCall, the live llm.stream path', async () => {
+    const session = await tempSession()
+    const adapter = createPiLoginAdapter(session, () => undefined)
+    const hosted: StreamChunk[] = [
+      { type: 'block-start', index: 0, blockType: 'text' },
+      { type: 'text-delta', index: 0, text: '这周 X 上挺热闹。' },
+      { type: 'block-end', index: 0, block: { type: 'text', text: '这周 X 上挺热闹。' } },
+      { type: 'block-start', index: 1, blockType: 'tool-call' },
+      { type: 'block-start', index: 2, blockType: 'tool-call' },
+      {
+        type: 'block-end', index: 1,
+        block: {
+          type: 'tool-call',
+          id: 'xs_call-9a4b9b0f-b5ed-4a3b-91f5-b5ca8e60c5ac-0|ctc_1_call-0' as never,
+          name: 'x_keyword_search',
+          arguments: '{}',
+        },
+      },
+      {
+        type: 'block-end', index: 2,
+        block: {
+          type: 'tool-call',
+          id: 'xs_call-9a4b9b0f-b5ed-4a3b-91f5-b5ca8e60c5ac-1|ctc_1_call-1' as never,
+          name: 'x_semantic_search',
+          arguments: '{}',
+        },
+      },
+      { type: 'finish', reason: { kind: 'tool-calls' } },
+    ]
+    const injectedStream = async function* (): AsyncIterable<StreamChunk> {
+      yield* hosted
+    }
+    const upstream = vi.spyOn(PiAiAdapter.prototype, 'stream').mockImplementation(injectedStream)
+    const basePrepare = PiAiAdapter.prototype.prepareCall
+    const preparedUpstream = vi.spyOn(PiAiAdapter.prototype, 'prepareCall').mockImplementation(async function (this: PiAiAdapter, ...args) {
+      const prepared = await basePrepare.apply(this, args)
+      return { ...prepared, stream: injectedStream }
+    })
+    try {
+      const options = { provider: 'pi-xai', model: 'grok-4.6', messages: [] }
+      const chunks: StreamChunk[] = []
+      for await (const chunk of (await adapter.prepareCall('pi-xai', 'grok-4.6')).stream(options)) {
+        chunks.push(chunk)
+      }
+      expect(chunks.some(chunk => chunk.type === 'block-end' && chunk.block.type === 'tool-call')).toBe(false)
+      expect(chunks.find(chunk => chunk.type === 'finish')).toMatchObject({ reason: { kind: 'stop' } })
+      expect(chunks.filter(chunk => chunk.type === 'text-delta').map(chunk => chunk.text)).toEqual(['这周 X 上挺热闹。'])
+    } finally {
+      upstream.mockRestore()
+      preparedUpstream.mockRestore()
+    }
+  })
 })

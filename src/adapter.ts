@@ -89,42 +89,60 @@ class PiLoginAdapter extends PiAiAdapter {
       ?? defaultReasoningEffortFor(model)
   }
 
-  override async prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedAdapterCall> {
-    const prepared = await this.session.proxy.run(() => super.prepareCall(provider, model, signal))
-    return {
-      ...prepared,
-      stream: options => withFailureHints(this.session.proxy.iterate(
-        prepared.stream(options),
-        provider === 'pi-openai-codex' && options.sessionId !== undefined ? String(options.sessionId) : undefined,
-      ), provider),
-    }
-  }
-
-  override async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
-    const capture: HostedCapture = { images: [] }
+  private sanitize(options: GenerateOptions): GenerateOptions {
     const defaultEffort = this.defaultEffort(options.provider, options.model)
-    const sanitized: GenerateOptions = {
+    return {
       ...options,
       messages: stripAssistantImages(options.messages),
       ...options.reasoningEffort === undefined && defaultEffort !== undefined
         ? { reasoningEffort: ReasoningEffortId(defaultEffort) }
         : {},
     }
+  }
+
+  /**
+   * Live `llm.stream` dispatches `prepareCall().stream`, not `adapter.stream()`.
+   * Hosted X Search / web_search traces must be stripped on that path too,
+   * or Harness executes them as UNKNOWN_TOOL.
+   */
+  private async * decorateStream(
+    options: GenerateOptions,
+    source: AsyncIterable<StreamChunk>,
+  ): AsyncIterable<StreamChunk> {
+    const capture: HostedCapture = { images: [] }
     try {
       const raw = iterateInCapture(capture, this.session.proxy.iterate(
-        super.stream(sanitized),
-        sanitized.provider === 'pi-openai-codex' && sanitized.sessionId !== undefined ? String(sanitized.sessionId) : undefined,
+        source,
+        options.provider === 'pi-openai-codex' && options.sessionId !== undefined
+          ? String(options.sessionId)
+          : undefined,
       ))
-      const plan = this.native.enabled ? nativePlanForRoute(sanitized.provider, this.native) : undefined
+      const plan = this.native.enabled ? nativePlanForRoute(options.provider, this.native) : undefined
       const filtered = plan === undefined ? raw : filterHostedServerToolTraces(raw)
       const attachments = this.native.image ? this.resolveAttachments() : undefined
-      const source = attachments === undefined
+      const decorated = attachments === undefined
         ? filtered
         : injectHostedImages(filtered, capture, input => attachments.saveImage(input))
-      yield* withFailureHints(source, sanitized.provider)
+      yield* withFailureHints(decorated, options.provider)
     } catch (error: unknown) {
-      throw withModelErrorHint(error, sanitized.provider)
+      throw withModelErrorHint(error, options.provider)
     }
+  }
+
+  override async prepareCall(provider: string, model: string, signal?: AbortSignal): Promise<PreparedAdapterCall> {
+    const prepared = await this.session.proxy.run(() => super.prepareCall(provider, model, signal))
+    return {
+      ...prepared,
+      stream: options => {
+        const sanitized = this.sanitize(options)
+        return this.decorateStream(sanitized, prepared.stream(sanitized))
+      },
+    }
+  }
+
+  override async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
+    const sanitized = this.sanitize(options)
+    yield* this.decorateStream(sanitized, super.stream(sanitized))
   }
 }
 
