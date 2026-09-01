@@ -99,6 +99,34 @@ describe('native OAuth tools', () => {
     expect(await collect(filterXaiServerToolTraces(stream(chunks)))).toEqual(chunks)
   })
 
+  it('drops parallel hosted X Search traces in one finish, not just the first call', async () => {
+    const chunks: StreamChunk[] = [
+      { type: 'block-start', index: 0, blockType: 'text' },
+      { type: 'text-delta', index: 0, text: 'cited' },
+      { type: 'block-end', index: 0, block: { type: 'text', text: 'cited' } },
+      { type: 'block-start', index: 1, blockType: 'tool-call' },
+      { type: 'block-start', index: 2, blockType: 'tool-call' },
+      {
+        type: 'block-end', index: 1,
+        block: {
+          type: 'tool-call', id: 'xs_call-a|ctc_a' as never,
+          name: 'x_keyword_search', arguments: '{}',
+        },
+      },
+      {
+        type: 'block-end', index: 2,
+        block: {
+          type: 'tool-call', id: 'xs_call-b|ctc_b' as never,
+          name: 'x_thread_fetch', arguments: '{}',
+        },
+      },
+      { type: 'finish', reason: { kind: 'tool-calls' } },
+    ]
+    const result = await collect(filterHostedServerToolTraces(stream(chunks)))
+    expect(result.some(chunk => chunk.type === 'block-end' && chunk.block.type === 'tool-call')).toBe(false)
+    expect(result.find(chunk => chunk.type === 'finish')).toMatchObject({ reason: { kind: 'stop' } })
+  })
+
   it('drops leftover hosted web_search calls so Harness does not report unknown tool', async () => {
     expect(isHostedServerToolCall({
       type: 'tool-call',
