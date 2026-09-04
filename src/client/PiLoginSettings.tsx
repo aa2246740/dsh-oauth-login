@@ -13,6 +13,7 @@ import { openLoginChallenge } from './login-window.ts'
 
 const STATUS_PATH = '/plugins/dsh-oauth-login/auth/status'
 const LOGIN_PATH = '/plugins/dsh-oauth-login/auth/login'
+const CANCEL_PATH = '/plugins/dsh-oauth-login/auth/cancel'
 const COMPLETE_PATH = '/plugins/dsh-oauth-login/auth/complete'
 const LOGOUT_PATH = '/plugins/dsh-oauth-login/auth/logout'
 const POLL_INTERVAL_MS = 1_000
@@ -77,6 +78,7 @@ const SETTINGS_CSS = `
   background:var(--dsw-alias-bg-module-platform);
 }
 .dsh-pi-login-row { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+.dsh-pi-login-row-actions { display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
 .dsh-pi-login-name { margin:0; font-size:15px; font-weight:600; color:var(--dsw-alias-label-primary); }
 .dsh-pi-login-status { display:flex; align-items:center; flex-wrap:wrap; gap:6px; font-size:13px; color:var(--dsw-alias-label-secondary); }
 .dsh-pi-login-dot { width:8px; height:8px; border-radius:50%; flex:0 0 auto; background:var(--dsw-alias-label-dimmed, #9aa0a6); }
@@ -238,6 +240,32 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
     }
   }
 
+  const cancelSignIn = async (id: string): Promise<void> => {
+    setBusy(id)
+    try {
+      await jsonRequest<{ ok: true }>(CANCEL_PATH, 'POST', { provider: id })
+      setChallengeUrls(current => {
+        const { [id]: _removed, ...next } = current
+        return next
+      })
+      setDrafts(current => {
+        const { [id]: _removed, ...next } = current
+        return next
+      })
+      await refresh()
+    } catch (caught: unknown) {
+      setError(caught instanceof Error ? caught.message : t('requestFailed'))
+    } finally {
+      setBusy(undefined)
+    }
+  }
+
+  const reopenSignIn = (url: string): void => {
+    openLoginChallenge(null, url, next => {
+      window.open(next, '_blank', 'noopener,noreferrer')
+    })
+  }
+
   const signOut = async (id: string): Promise<void> => {
     setBusy(id)
     try {
@@ -300,7 +328,32 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
                               {busy === provider.id ? t('working') : t('logout')}
                             </button>
                           )
-                        : (
+                        : account.status === 'signing-in'
+                          ? (
+                              <div className="dsh-pi-login-row-actions">
+                                {challengeUrl !== undefined
+                                  ? (
+                                      <button
+                                        type="button"
+                                        className="dsh-pi-login-btn dsh-pi-login-btn-primary"
+                                        disabled={busy !== undefined}
+                                        onClick={() => { reopenSignIn(challengeUrl) }}
+                                      >
+                                        {t('reopenAuthorization')}
+                                      </button>
+                                    )
+                                  : null}
+                                <button
+                                  type="button"
+                                  className="dsh-pi-login-btn dsh-pi-login-btn-secondary"
+                                  disabled={busy !== undefined}
+                                  onClick={() => { void cancelSignIn(provider.id) }}
+                                >
+                                  {busy === provider.id ? t('working') : t('cancelLogin')}
+                                </button>
+                              </div>
+                            )
+                          : (
                             <button
                               type="button"
                               className="dsh-pi-login-btn dsh-pi-login-btn-primary"
@@ -315,7 +368,7 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
                                     ? t('connectPlan')
                                     : t('login')}
                             </button>
-                          )}
+                            )}
                     </div>
                     <div className="dsh-pi-login-status" role="status">
                       <span aria-hidden="true" className={dotClass} />

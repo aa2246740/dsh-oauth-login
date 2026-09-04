@@ -46,6 +46,7 @@ export {
 export type { PiLoginAuthStatus } from './auth.ts'
 export {
   registerPiLoginAuthRoutes,
+  PI_LOGIN_AUTH_CANCEL_PATH,
   PI_LOGIN_AUTH_COMPLETE_PATH,
   PI_LOGIN_AUTH_LOGIN_PATH,
   PI_LOGIN_AUTH_LOGOUT_PATH,

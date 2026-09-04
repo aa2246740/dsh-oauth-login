@@ -15,6 +15,7 @@ import { ProxySettingsConflict } from './proxy-store.ts'
 
 export const PI_LOGIN_AUTH_STATUS_PATH = '/plugins/dsh-oauth-login/auth/status'
 export const PI_LOGIN_AUTH_LOGIN_PATH = '/plugins/dsh-oauth-login/auth/login'
+export const PI_LOGIN_AUTH_CANCEL_PATH = '/plugins/dsh-oauth-login/auth/cancel'
 export const PI_LOGIN_AUTH_COMPLETE_PATH = '/plugins/dsh-oauth-login/auth/complete'
 export const PI_LOGIN_AUTH_LOGOUT_PATH = '/plugins/dsh-oauth-login/auth/logout'
 
@@ -64,6 +65,18 @@ export interface LoginChallenge {
   url?: string
   userCode?: string
   input?: LoginInputChallenge
+}
+
+/** Keep the browser authorization URL available while Pi also waits for a manual callback. */
+export function mergeLoginChallenge(
+  previous: LoginChallenge | undefined,
+  next: LoginChallenge,
+): LoginChallenge {
+  return {
+    ...next,
+    ...next.url === undefined && previous?.url !== undefined ? { url: previous.url } : {},
+    ...next.userCode === undefined && previous?.userCode !== undefined ? { userCode: previous.userCode } : {},
+  }
 }
 
 function waitForPromptAbort(prompt: AuthPrompt): Promise<string> {
@@ -123,6 +136,15 @@ class ProviderAuth {
     await this.operation?.catch(() => undefined)
     await this.session.logout(this.spec.id)
     this.state = { status: 'signed-out' }
+    this.challenge = undefined
+  }
+
+  async cancel(): Promise<void> {
+    const error = new Error('Pi login cancelled')
+    this.rejectInput(error)
+    this.cancellation?.abort(error)
+    await this.operation?.catch(() => undefined)
+    this.state = await this.readStored()
     this.challenge = undefined
   }
 
@@ -254,15 +276,16 @@ class ProviderAuth {
       this.rejectChallenge(error)
       return
     }
-    this.challenge = challenge
+    const merged = mergeLoginChallenge(this.challenge, challenge)
+    this.challenge = merged
     this.state = {
       status: 'signing-in',
-      kind: challenge.kind,
-      ...challenge.url === undefined ? {} : { url: challenge.url },
-      ...challenge.userCode === undefined ? {} : { userCode: challenge.userCode },
-      ...challenge.input === undefined ? {} : { input: challenge.input },
+      kind: merged.kind,
+      ...merged.url === undefined ? {} : { url: merged.url },
+      ...merged.userCode === undefined ? {} : { userCode: merged.userCode },
+      ...merged.input === undefined ? {} : { input: merged.input },
     }
-    for (const waiter of this.challengeWaiters.splice(0)) waiter.resolve(challenge)
+    for (const waiter of this.challengeWaiters.splice(0)) waiter.resolve(merged)
   }
 
   private async readStored(): Promise<PiLoginAccountState> {
@@ -328,6 +351,11 @@ export class PiLoginWebAuth {
   async signOut(id: string): Promise<void> {
     requirePiLoginProvider(id)
     await this.slot(id).signOut()
+  }
+
+  async cancel(id: string): Promise<void> {
+    requirePiLoginProvider(id)
+    await this.slot(id).cancel()
   }
 
   async submitInput(id: string, value: string): Promise<PiLoginAccountState> {
@@ -512,6 +540,20 @@ export function registerPiLoginAuthRoutes(
               })
             }
             json(res, 200, challenge)
+          } catch (error: unknown) {
+            json(res, 500, { error: safeMessage(error) })
+          }
+        },
+      }),
+      ctx.webServer.register({
+        kind: 'exact',
+        path: PI_LOGIN_AUTH_CANCEL_PATH,
+        handler: async (req, res) => {
+          if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
+          if (!trustedRequest(req)) return json(res, 403, { error: 'forbidden' })
+          try {
+            await auth.cancel(providerIdFrom(await readJson(req)))
+            json(res, 200, { ok: true })
           } catch (error: unknown) {
             json(res, 500, { error: safeMessage(error) })
           }

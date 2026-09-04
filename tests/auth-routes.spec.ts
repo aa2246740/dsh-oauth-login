@@ -2,7 +2,7 @@ import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { loginInputChallenge, PiLoginWebAuth } from '../src/auth-routes.ts'
+import { loginInputChallenge, mergeLoginChallenge, PiLoginWebAuth } from '../src/auth-routes.ts'
 import { PiLoginSession } from '../src/session.ts'
 import { PiLoginCredentialStore } from '../src/store.ts'
 
@@ -16,6 +16,23 @@ async function tempSession(): Promise<PiLoginSession> {
 }
 
 describe('PiLoginWebAuth API-key flow', () => {
+  it('keeps the browser URL when OAuth advances to a manual callback prompt', () => {
+    expect(mergeLoginChallenge({
+      provider: 'openai-codex',
+      kind: 'browser',
+      url: 'https://auth.openai.com/oauth/authorize',
+    }, {
+      provider: 'openai-codex',
+      kind: 'input',
+      input: { type: 'manual_code', message: 'Paste the callback URL' },
+    })).toEqual({
+      provider: 'openai-codex',
+      kind: 'input',
+      url: 'https://auth.openai.com/oauth/authorize',
+      input: { type: 'manual_code', message: 'Paste the callback URL' },
+    })
+  })
+
   it('preserves manual callback challenges on the browser contract', () => {
     expect(loginInputChallenge({
       type: 'manual_code',
@@ -63,6 +80,19 @@ describe('PiLoginWebAuth API-key flow', () => {
       await auth.signIn('zai-coding-cn')
       await expect(auth.submitInput('zai-coding-cn', '   ')).rejects.toThrow(/must not be empty/)
       expect(await session.store.read('zai-coding-cn')).toBeUndefined()
+    } finally {
+      await auth.dispose()
+    }
+  })
+
+  it('cancels a pending login without leaving an error state', async () => {
+    const session = await tempSession()
+    const auth = new PiLoginWebAuth(session)
+    try {
+      await auth.signIn('zai-coding-cn')
+      await auth.cancel('zai-coding-cn')
+      const status = (await auth.status()).find(provider => provider.id === 'zai-coding-cn')
+      expect(status?.account).toEqual({ status: 'signed-out' })
     } finally {
       await auth.dispose()
     }
