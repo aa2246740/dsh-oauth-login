@@ -312,7 +312,7 @@ declare const PI_LOGIN_AUTH_LOGIN_PATH = "/plugins/dsh-oauth-login/auth/login";
 declare const PI_LOGIN_AUTH_COMPLETE_PATH = "/plugins/dsh-oauth-login/auth/complete";
 declare const PI_LOGIN_AUTH_LOGOUT_PATH = "/plugins/dsh-oauth-login/auth/logout";
 interface LoginInputChallenge {
-  type: 'secret' | 'text';
+  type: 'secret' | 'text' | 'manual_code';
   message: string;
   placeholder?: string;
 }

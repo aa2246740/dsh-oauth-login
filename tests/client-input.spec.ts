@@ -3,8 +3,22 @@ import { applyDraftChange } from '../src/client/draft-input.ts'
 import { isAutomaticProxyDraft, proxyDraft, proxyDraftSettings } from '../src/client/proxy-draft.ts'
 import { defaultProxySettings } from '../src/proxy-config.ts'
 import { loginInputCopy } from '../src/client/login-input-copy.ts'
+import { openLoginChallenge } from '../src/client/login-window.ts'
 
 describe('Pi login credential input', () => {
+  it('opens the real OAuth URL when the host rejects the reserved blank popup', () => {
+    const opened: string[] = []
+    expect(openLoginChallenge(null, 'https://auth.openai.com/oauth/authorize', url => opened.push(url))).toBe('fallback')
+    expect(opened).toEqual(['https://auth.openai.com/oauth/authorize'])
+  })
+  it('reuses a reserved browser popup without opening a duplicate', () => {
+    const replaced: string[] = []
+    const opened: string[] = []
+    const popup = { close() {}, location: { replace(url: string) { replaced.push(url) } } }
+    expect(openLoginChallenge(popup, 'https://auth.openai.com/oauth/authorize', url => opened.push(url))).toBe('reserved')
+    expect(replaced).toEqual(['https://auth.openai.com/oauth/authorize'])
+    expect(opened).toEqual([])
+  })
   it('uses callback copy only for OAuth manual-code challenges and preserves Plan API-key copy', () => {
     expect(loginInputCopy('oauth', 'manual_code')).toEqual({
       waiting: 'waitingForCallback', help: 'callbackHelp', placeholder: 'callbackPlaceholder',

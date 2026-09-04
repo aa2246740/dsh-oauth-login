@@ -9,6 +9,7 @@ import type { OpenRouterCatalogClient } from './openrouter-store.ts'
 import { OpenRouterSyncStatus } from './OpenRouterSyncStatus.tsx'
 import { ProxySettings } from './ProxySettings.tsx'
 import { loginInputCopy } from './login-input-copy.ts'
+import { openLoginChallenge } from './login-window.ts'
 
 const STATUS_PATH = '/plugins/dsh-oauth-login/auth/status'
 const LOGIN_PATH = '/plugins/dsh-oauth-login/auth/login'
@@ -164,6 +165,7 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
   const [error, setError] = useState<string | undefined>(undefined)
   const [busy, setBusy] = useState<string | undefined>(undefined)
   const [drafts, setDrafts] = useState<Drafts>({})
+  const [challengeUrls, setChallengeUrls] = useState<Record<string, string>>({})
 
   useEffect(() => { ensureThemeStyles() }, [])
 
@@ -188,11 +190,19 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
   const signIn = async (id: string): Promise<void> => {
     const popup = window.open('about:blank', '_blank')
     if (popup !== null) popup.opener = null
+    setChallengeUrls(current => {
+      const { [id]: _removed, ...next } = current
+      return next
+    })
     setBusy(id)
     try {
       const challenge = await jsonRequest<LoginChallenge>(LOGIN_PATH, 'POST', { provider: id })
-      if (popup !== null && challenge.url !== undefined) popup.location.replace(challenge.url)
-      if (popup !== null && challenge.url === undefined) popup.close()
+      if (challenge.url !== undefined) {
+        setChallengeUrls(current => ({ ...current, [id]: challenge.url! }))
+      }
+      openLoginChallenge(popup, challenge.url, url => {
+        window.open(url, '_blank', 'noopener,noreferrer')
+      })
       await refresh()
     } catch (caught: unknown) {
       popup?.close()
@@ -212,6 +222,10 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
     setBusy(provider.id)
     try {
       await jsonRequest<{ ok: true }>(COMPLETE_PATH, 'POST', { provider: provider.id, value })
+      setChallengeUrls(current => {
+        const { [provider.id]: _removed, ...next } = current
+        return next
+      })
       setDrafts(current => {
         const { [provider.id]: _removed, ...next } = current
         return next
@@ -228,6 +242,10 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
     setBusy(id)
     try {
       await jsonRequest<{ ok: true }>(LOGOUT_PATH, 'POST', { provider: id })
+      setChallengeUrls(current => {
+        const { [id]: _removed, ...next } = current
+        return next
+      })
       await refresh()
     } catch (caught: unknown) {
       setError(caught instanceof Error ? caught.message : t('requestFailed'))
@@ -249,6 +267,9 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
                 const account = provider.account
                 const inputCopy = account.status === 'signing-in' && account.input !== undefined
                   ? loginInputCopy(provider.authType, account.input.type)
+                  : undefined
+                const challengeUrl = account.status === 'signing-in'
+                  ? account.url ?? challengeUrls[provider.id]
                   : undefined
                 const label = account.status === 'signed-in'
                   ? t('signedIn')
@@ -306,12 +327,12 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
                     {account.status === 'signing-in' && account.userCode !== undefined
                       ? <p className="dsh-pi-login-body">{t('userCode')} <span className="dsh-pi-login-code">{account.userCode}</span></p>
                       : null}
-                    {account.status === 'signing-in' && account.url !== undefined
+                    {account.status === 'signing-in' && challengeUrl !== undefined
                       ? (
                           <p className="dsh-pi-login-body">
                             {provider.authType === 'api_key' && account.input !== undefined ? t('openPlanPage') : t('openUrl')}
                             {' '}
-                            <a href={account.url} target="_blank" rel="noreferrer" className="dsh-pi-login-link">{account.url}</a>
+                            <a href={challengeUrl} target="_blank" rel="noreferrer" className="dsh-pi-login-link">{challengeUrl}</a>
                           </p>
                         )
                       : null}
