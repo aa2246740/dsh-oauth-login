@@ -19,9 +19,22 @@ export const PI_LOGIN_AUTH_COMPLETE_PATH = '/plugins/dsh-oauth-login/auth/comple
 export const PI_LOGIN_AUTH_LOGOUT_PATH = '/plugins/dsh-oauth-login/auth/logout'
 
 export interface LoginInputChallenge {
-  type: 'secret' | 'text'
+  type: 'secret' | 'text' | 'manual_code'
   message: string
   placeholder?: string
+}
+
+type InputAuthPrompt = Extract<AuthPrompt, { type: 'secret' | 'text' | 'manual_code' }>
+
+/** Preserve the Pi prompt discriminator on the browser wire contract. */
+export function loginInputChallenge(prompt: InputAuthPrompt): LoginInputChallenge {
+  return {
+    type: prompt.type,
+    message: prompt.message,
+    ...'placeholder' in prompt && prompt.placeholder !== undefined
+      ? { placeholder: prompt.placeholder }
+      : {},
+  }
 }
 
 export type PiLoginAccountState =
@@ -176,17 +189,11 @@ class ProviderAuth {
     return waitForPromptAbort(prompt)
   }
 
-  private requestInput(prompt: AuthPrompt): Promise<string> {
+  private requestInput(prompt: InputAuthPrompt): Promise<string> {
     if (this.pendingInput !== undefined) {
       return Promise.reject(new Error(`${this.spec.displayName} already has a pending credential prompt`))
     }
-    const input: LoginInputChallenge = {
-      type: prompt.type === 'secret' ? 'secret' : 'text',
-      message: prompt.message,
-      ...'placeholder' in prompt && prompt.placeholder !== undefined
-        ? { placeholder: prompt.placeholder }
-        : {},
-    }
+    const input = loginInputChallenge(prompt)
     const signals = [this.cancellation?.signal, prompt.signal]
       .filter((signal): signal is AbortSignal => signal !== undefined)
     const wait = new Promise<string>((resolve, reject) => {

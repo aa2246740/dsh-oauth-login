@@ -12,47 +12,17 @@ import {
   useEffect, useId, useMemo, useRef, useState, useSyncExternalStore,
   type KeyboardEvent, type FocusEvent,
 } from 'react'
-import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
+import type { ModelDirectoryState as DirectoryState, ModelSelectInjected } from '@deepseek-ai/dsh-client-ui-model-selection/client'
+import type { InjectFace, PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { filterGroups } from './model-filter.ts'
 import type { FilterGroup } from './model-filter.ts'
 import type { OpenRouterCatalogClient } from './openrouter-store.ts'
 import { OpenRouterSyncStatus } from './OpenRouterSyncStatus.tsx'
 import { OPENROUTER_ROUTE } from '../openrouter-types.ts'
 
-/** Structural mirror of the wire ModelSelection (no runtime import needed). */
-interface ModelSelection {
-  provider: string
-  model: string
-  reasoningEffort?: string
-}
-
-/** Structural mirror of the shared directory snapshot. */
-interface DirectoryState {
-  current: ModelSelection | null
-  routable: boolean | null
-  groups: readonly {
-    id: string
-    name: string
-    models: readonly {
-      id: string
-      name: string
-      description?: string
-      reasoning?: {
-        efforts: readonly { id: string; name: string; description?: string }[]
-        defaultEffort?: string
-      }
-    }[]
-  }[]
-  failures: readonly { id: string; name: string; message: string }[]
-  status: 'idle' | 'loading' | 'ready' | 'selecting' | 'error'
-  error: string | null
-}
-
 /** Which pane the dropdown shows. */
 type Pane = 'root' | 'model' | 'effort'
-
-/** Exported store face so the entry's local service mirror stays in sync. */
-export type SnapshotStoreOf = SnapshotStore<DirectoryState>
 
 /** One effort row; undefined effort preserves the provider default. */
 interface EffortChoice {
@@ -63,18 +33,15 @@ interface EffortChoice {
 }
 
 /** Component props: owner share + injected face + both translators. */
-export interface SearchableModelSelectProps {
-  locked: boolean
-  available: boolean
-  directory: SnapshotStore<DirectoryState>
+export interface SearchableModelSelectInjected extends ModelSelectInjected {
   catalog: OpenRouterCatalogClient
-  load: () => void
-  select: (selection: ModelSelection) => Promise<boolean>
-  /** Official `model` namespace translate (trigger/menu/error copy). */
-  t: (key: string, params?: Record<string, unknown>) => string
   /** Plugin `model-search` namespace translate (search box copy). */
-  ts: (key: string, params?: Record<string, unknown>) => string
+  ts: TranslateNS<'model-search'>
 }
+
+export type SearchableModelSelectProps = PropsRuntime<'conversation.input.model'>
+  & PropsLocale<'model'>
+  & InjectFace<SearchableModelSelectInjected>
 
 const STYLE_ID = 'dsh-oauth-model-search-theme'
 
@@ -254,9 +221,10 @@ export function SearchableModelSelect(
           : { reasoningEffort: model.reasoning.defaultEffort },
       } satisfies ModelSelection,
     }))), [state.groups])
-  const selectedIndex = state.current === null
+  const current = state.current
+  const selectedIndex = current === null
     ? -1
-    : choices.findIndex(c => c.selection.provider === state.current?.provider && c.selection.model === state.current.model)
+    : choices.findIndex(c => c.selection.provider === current.provider && c.selection.model === current.model)
   const currentChoice = choices[selectedIndex]
   const reasoning = currentChoice?.model.reasoning
   const effectiveEffort = state.current?.reasoningEffort ?? reasoning?.defaultEffort
@@ -371,7 +339,8 @@ export function SearchableModelSelect(
   const choose = (selection: ModelSelection): void => {
     const info = selection.provider === OPENROUTER_ROUTE ? metadata.get(selection.model) : undefined
     if (info?.freeOnly && info.priceStatus !== 'free') return
-    if (state.current?.provider === selection.provider && state.current.model === selection.model) {
+    const current = state.current
+    if (current?.provider === selection.provider && current.model === selection.model) {
       close(true)
       return
     }

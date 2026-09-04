@@ -1,3 +1,6 @@
+import { existsSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { defineConfig } from 'tsdown'
 
 const nodeExternal = [
@@ -6,6 +9,13 @@ const nodeExternal = [
   'react',
   'react/jsx-runtime',
 ]
+
+const harness = process.env.DSHX_HARNESS
+if (harness === undefined) throw new Error('Set DSHX_HARNESS to the checkout used for this build.')
+const adapter = resolve(harness, 'tools/dshx/src/client-build.js')
+if (!existsSync(adapter)) throw new Error('DSHX externalClientBundle adapter is missing.')
+const { externalClientBundle } = await import(pathToFileURL(adapter).href)
+const client = externalClientBundle('dsh-oauth-login', [], { clientEntry: 'src/client/index.tsx' })[1]
 
 export default defineConfig([
   {
@@ -31,15 +41,5 @@ export default defineConfig([
     fixedExtension: false,
     deps: { neverBundle: nodeExternal },
   },
-  {
-    entry: {
-      client: 'src/client/index.tsx',
-    },
-    platform: 'browser',
-    format: 'cjs',
-    dts: false,
-    outDir: 'lib',
-    fixedExtension: false,
-    deps: { neverBundle: ['react', 'react/jsx-runtime'] },
-  },
+  client,
 ])

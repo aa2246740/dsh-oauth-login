@@ -2,7 +2,7 @@ import { mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { PiLoginWebAuth } from '../src/auth-routes.ts'
+import { loginInputChallenge, PiLoginWebAuth } from '../src/auth-routes.ts'
 import { PiLoginSession } from '../src/session.ts'
 import { PiLoginCredentialStore } from '../src/store.ts'
 
@@ -16,6 +16,18 @@ async function tempSession(): Promise<PiLoginSession> {
 }
 
 describe('PiLoginWebAuth API-key flow', () => {
+  it('preserves manual callback challenges on the browser contract', () => {
+    expect(loginInputChallenge({
+      type: 'manual_code',
+      message: 'Paste the callback URL',
+      placeholder: 'http://localhost/callback?code=…',
+    })).toEqual({
+      type: 'manual_code',
+      message: 'Paste the callback URL',
+      placeholder: 'http://localhost/callback?code=…',
+    })
+  })
+
   it('opens the official Plan page, accepts a key, and publishes signed-in state', async () => {
     const session = await tempSession()
     const auth = new PiLoginWebAuth(session)

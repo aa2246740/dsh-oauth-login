@@ -2,8 +2,20 @@ import { describe, expect, it } from 'vitest'
 import { applyDraftChange } from '../src/client/draft-input.ts'
 import { isAutomaticProxyDraft, proxyDraft, proxyDraftSettings } from '../src/client/proxy-draft.ts'
 import { defaultProxySettings } from '../src/proxy-config.ts'
+import { loginInputCopy } from '../src/client/login-input-copy.ts'
 
 describe('Pi login credential input', () => {
+  it('uses callback copy only for OAuth manual-code challenges and preserves Plan API-key copy', () => {
+    expect(loginInputCopy('oauth', 'manual_code')).toEqual({
+      waiting: 'waitingForCallback', help: 'callbackHelp', placeholder: 'callbackPlaceholder',
+      action: 'submitCallback', required: 'callbackRequired',
+    })
+    expect(loginInputCopy('api_key', 'secret')).toEqual({
+      waiting: 'waitingForCredential', help: 'credentialHelp', placeholder: 'credentialPlaceholder',
+      action: 'saveCredential', required: 'credentialRequired',
+    })
+    expect(loginInputCopy('oauth', 'text').waiting).toBe('waitingForAuthInput')
+  })
   it('captures the input value before React clears the synthetic event', () => {
     type Drafts = Record<string, string>
     let pending: ((current: Drafts) => Drafts) | undefined

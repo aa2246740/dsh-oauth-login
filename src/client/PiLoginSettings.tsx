@@ -4,9 +4,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { applyDraftChange } from './draft-input.ts'
 import type { Drafts } from './draft-input.ts'
 import type { PiLoginKey } from './locales.ts'
+import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { OpenRouterCatalogClient } from './openrouter-store.ts'
 import { OpenRouterSyncStatus } from './OpenRouterSyncStatus.tsx'
 import { ProxySettings } from './ProxySettings.tsx'
+import { loginInputCopy } from './login-input-copy.ts'
 
 const STATUS_PATH = '/plugins/dsh-oauth-login/auth/status'
 const LOGIN_PATH = '/plugins/dsh-oauth-login/auth/login'
@@ -28,7 +30,7 @@ type AccountState =
   | { status: 'error'; message: string }
 
 interface LoginInputChallenge {
-  type: 'secret' | 'text'
+  type: 'secret' | 'text' | 'manual_code'
   message: string
   placeholder?: string
 }
@@ -52,7 +54,7 @@ interface LoginChallenge {
 
 export interface PiLoginSettingsInjected {
   t: (key: PiLoginKey, params?: Record<string, unknown>) => string
-  ts: (key: string, params?: Record<string, unknown>) => string
+  ts: TranslateNS<'model-search'>
   catalog: OpenRouterCatalogClient
 }
 
@@ -200,17 +202,18 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
     }
   }
 
-  const submitInput = async (id: string): Promise<void> => {
-    const value = drafts[id]?.trim() ?? ''
+  const submitInput = async (provider: ProviderStatus): Promise<void> => {
+    const value = drafts[provider.id]?.trim() ?? ''
     if (value.length === 0) {
-      setError(t('credentialRequired'))
+      const challenge = provider.account.status === 'signing-in' ? provider.account.input : undefined
+      setError(t(challenge === undefined ? 'authInputRequired' : loginInputCopy(provider.authType, challenge.type).required))
       return
     }
-    setBusy(id)
+    setBusy(provider.id)
     try {
-      await jsonRequest<{ ok: true }>(COMPLETE_PATH, 'POST', { provider: id, value })
+      await jsonRequest<{ ok: true }>(COMPLETE_PATH, 'POST', { provider: provider.id, value })
       setDrafts(current => {
-        const { [id]: _removed, ...next } = current
+        const { [provider.id]: _removed, ...next } = current
         return next
       })
       await refresh()
@@ -244,10 +247,13 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
             <div className="dsh-pi-login-stack">
               {providers.map(provider => {
                 const account = provider.account
+                const inputCopy = account.status === 'signing-in' && account.input !== undefined
+                  ? loginInputCopy(provider.authType, account.input.type)
+                  : undefined
                 const label = account.status === 'signed-in'
                   ? t('signedIn')
                   : account.status === 'signing-in'
-                    ? account.input === undefined ? t('signingIn') : t('waitingForCredential')
+                    ? inputCopy === undefined ? t('signingIn') : t(inputCopy.waiting)
                     : account.status === 'error'
                       ? t('requestFailed')
                       : t('signedOut')
@@ -303,7 +309,7 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
                     {account.status === 'signing-in' && account.url !== undefined
                       ? (
                           <p className="dsh-pi-login-body">
-                            {account.input === undefined ? t('openUrl') : t('openPlanPage')}
+                            {provider.authType === 'api_key' && account.input !== undefined ? t('openPlanPage') : t('openUrl')}
                             {' '}
                             <a href={account.url} target="_blank" rel="noreferrer" className="dsh-pi-login-link">{account.url}</a>
                           </p>
@@ -315,17 +321,17 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
                             className="dsh-pi-login-form"
                             onSubmit={(event) => {
                               event.preventDefault()
-                              void submitInput(provider.id)
+                              void submitInput(provider)
                             }}
                           >
-                            <p className="dsh-pi-login-body">{t('credentialHelp')}</p>
+                            <p className="dsh-pi-login-body">{t(inputCopy?.help ?? 'authInputHelp')}</p>
                             <input
                               type={account.input.type === 'secret' ? 'password' : 'text'}
                               className="dsh-pi-login-input"
                               aria-label={account.input.message}
                               autoComplete="off"
                               spellCheck={false}
-                              placeholder={t('credentialPlaceholder')}
+                              placeholder={t(inputCopy?.placeholder ?? 'authInputPlaceholder')}
                               value={drafts[provider.id] ?? ''}
                               disabled={busy !== undefined}
                               onChange={(event) => {
@@ -338,7 +344,7 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
                                 className="dsh-pi-login-btn dsh-pi-login-btn-primary"
                                 disabled={busy !== undefined || (drafts[provider.id]?.trim().length ?? 0) === 0}
                               >
-                                {busy === provider.id ? t('working') : t('saveCredential')}
+                                {busy === provider.id ? t('working') : t(inputCopy?.action ?? 'submitAuthInput')}
                               </button>
                             </div>
                           </form>

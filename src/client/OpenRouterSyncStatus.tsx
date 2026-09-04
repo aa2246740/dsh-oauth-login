@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { OpenRouterCatalogClient } from './openrouter-store.ts'
+import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 
 const CSS = [
   '.dsh-or-sync{display:flex;flex-direction:column;gap:4px;padding:6px 8px;font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary);min-width:0}',
@@ -15,7 +16,7 @@ const CSS = [
 
 export interface OpenRouterSyncStatusProps {
   catalog: OpenRouterCatalogClient
-  ts: (key: string, params?: Record<string, unknown>) => string
+  ts: TranslateNS<'model-search'>
   details?: boolean
 }
 
