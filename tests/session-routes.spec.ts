@@ -17,6 +17,16 @@ async function tempSession(): Promise<PiLoginSession> {
 }
 
 describe('authenticated harness routes', () => {
+  it('resolves Astra through the DSH adapter with its supported reasoning default', async () => {
+    const session = await tempSession()
+    session.ensureTransport = async () => ({ source: 'direct' })
+    const adapter = createPiLoginAdapter(session, () => undefined)
+    expect((await adapter.listModels('pi-openai-codex')).some(model => model.id === 'gpt-6-astra')).toBe(true)
+    expect(await adapter.resolveModel('pi-openai-codex', 'gpt-6-astra')).toMatchObject({
+      id: 'gpt-6-astra', context: { contextWindow: 272_000 }, reasoning: { defaultEffort: 'medium' },
+    })
+  })
+
   it('starts empty and only lists routes with a stored grant', async () => {
     const session = await tempSession()
     expect(await session.authenticatedRoutes()).toEqual([])

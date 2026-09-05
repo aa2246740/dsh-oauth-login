@@ -5,6 +5,23 @@ import { defaultReasoningEffortFor, extraModelsFor } from '../src/extra-models.t
 import { catalogProvider, harnessModels, harnessProvider, preferredModel } from '../src/provider.ts'
 
 describe('Pi login catalog', () => {
+  it('adds Astra to Codex OAuth without losing older models or unsupported effort filtering', () => {
+    const codex = piLoginProvider('openai-codex')!
+    const models = harnessModels(codex)
+    const astra = models.find(model => model.id === 'gpt-6-astra')!
+    expect(models.filter(model => model.id === astra.id)).toHaveLength(1)
+    expect(astra).toMatchObject({
+      name: 'GPT-6 Astra', provider: 'pi-openai-codex', api: 'openai-codex-responses',
+      baseUrl: 'https://chatgpt.com/backend-api', input: ['text', 'image'],
+      contextWindow: 272_000, maxTokens: 128_000,
+    })
+    expect(getSupportedThinkingLevels(astra)).toEqual(['low', 'medium', 'high', 'xhigh', 'max'])
+    expect(defaultReasoningEffortFor(astra.id)).toBe('medium')
+    for (const old of catalogProvider('openai-codex').getModels()) {
+      expect(models.some(model => model.id === old.id)).toBe(true)
+    }
+  })
+
   it('covers the Pi subscription credential set', () => {
     expect(PI_LOGIN_PROVIDERS.map(provider => provider.id).sort()).toEqual([
       'anthropic',

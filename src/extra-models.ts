@@ -5,6 +5,35 @@
 
 import type { Api, Model } from '@earendil-works/pi-ai'
 
+/**
+ * https://developers.openai.com/api/docs/models/gpt-6-astra
+ * Use the Codex catalog's default 272K context, not the API's larger ceiling.
+ * Ultra is an app orchestration mode, not a Pi reasoning effort.
+ */
+const OPENAI_CODEX_EXTRA_MODELS: readonly Model<Api>[] = [
+  {
+    id: 'gpt-6-astra',
+    name: 'GPT-6 Astra',
+    api: 'openai-codex-responses',
+    provider: 'openai-codex',
+    baseUrl: 'https://chatgpt.com/backend-api',
+    reasoning: true,
+    input: ['text', 'image'],
+    cost: { input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 },
+    contextWindow: 272_000,
+    maxTokens: 128_000,
+    thinkingLevelMap: {
+      off: null,
+      minimal: null,
+      low: 'low',
+      medium: 'medium',
+      high: 'high',
+      xhigh: 'xhigh',
+      max: 'max',
+    },
+  },
+]
+
 /** Newer xAI Grok models missing from the installed pi-ai catalog (0.82.x). */
 const XAI_EXTRA_MODELS: readonly Model<Api>[] = [
   {
@@ -148,7 +177,8 @@ const OPENROUTER_EXTRA_MODELS: readonly Model<Api>[] = [
 /** Per-model default the selector and request path should apply when omitted. */
 export function defaultReasoningEffortFor(
   modelId: string,
-): typeof OX_ALPHA_DEFAULT_EFFORT | typeof GLM_5_3_DEFAULT_EFFORT | typeof GLM_5_3_FLASH_DEFAULT_EFFORT | undefined {
+): typeof OX_ALPHA_DEFAULT_EFFORT | typeof GLM_5_3_DEFAULT_EFFORT | typeof GLM_5_3_FLASH_DEFAULT_EFFORT | 'medium' | undefined {
+  if (modelId === 'gpt-6-astra') return 'medium'
   if (modelId === OX_ALPHA_MODEL_ID) return OX_ALPHA_DEFAULT_EFFORT
   if (modelId === GLM_5_3_MODEL_ID) return GLM_5_3_DEFAULT_EFFORT
   if (modelId === GLM_5_3_FLASH_MODEL_ID) return GLM_5_3_FLASH_DEFAULT_EFFORT
@@ -156,6 +186,7 @@ export function defaultReasoningEffortFor(
 }
 
 const EXTRA_MODELS_BY_PROVIDER: Readonly<Record<string, readonly Model<Api>[]>> = {
+  'openai-codex': OPENAI_CODEX_EXTRA_MODELS,
   xai: XAI_EXTRA_MODELS,
   openrouter: OPENROUTER_EXTRA_MODELS,
   'zai-coding-cn': ZAI_CODING_CN_EXTRA_MODELS,
