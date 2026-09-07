@@ -17,6 +17,8 @@ import {
 } from '../src/native-tools.ts'
 import type { StreamOptions } from '@earendil-works/pi-ai'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
+import { requirePiLoginProvider } from '../src/catalog.ts'
+import { harnessProvider } from '../src/provider.ts'
 
 async function collect(source: AsyncIterable<StreamChunk>): Promise<StreamChunk[]> {
   const chunks: StreamChunk[] = []
@@ -29,6 +31,44 @@ async function* stream(chunks: readonly StreamChunk[]): AsyncGenerator<StreamChu
 }
 
 describe('native OAuth tools', () => {
+  it.each(['stream', 'streamSimple'] as const)(
+    'serializes Grok 4.6 native tools through Responses on %s',
+    async (method) => {
+      const provider = harnessProvider(requirePiLoginProvider('xai'))
+      const model = provider.getModels().find(candidate => candidate.id === 'grok-4.6')
+      if (model === undefined) throw new Error('grok-4.6 missing')
+
+      let captured: { payload: unknown; api: string } | undefined
+      const events = provider[method](model, {
+        messages: [{ role: 'user', content: [{ type: 'text', text: 'Search X.' }], timestamp: 1 }],
+        tools: [
+          { name: 'bash', description: 'Run a command.', parameters: { type: 'object' } },
+          { name: 'web_search', description: 'Search the web.', parameters: { type: 'object' } },
+          { name: 'web_fetch', description: 'Fetch a page.', parameters: { type: 'object' } },
+        ],
+      }, {
+        apiKey: 'test-only',
+        onPayload: (payload, sentModel) => {
+          captured = { payload, api: sentModel.api }
+          throw new Error('payload captured')
+        },
+      })
+      for await (const _event of events) { /* onPayload ends the stream before transport */ }
+
+      expect(captured).toEqual({
+        api: 'openai-responses',
+        payload: expect.objectContaining({
+          tools: [
+            { type: 'web_search' },
+            { type: 'x_search' },
+            { type: 'image_generation' },
+            expect.objectContaining({ type: 'function', name: 'bash' }),
+          ],
+        }),
+      })
+    },
+  )
+
   it('recognizes only documented xAI server X Search calls with xs_call ids', () => {
     expect(isXaiServerXSearchCall({
       type: 'tool-call',
@@ -82,6 +122,20 @@ describe('native OAuth tools', () => {
       type: 'finish', reason: { kind: 'stop' },
       replayState: { response: { stopReason: 'stop' }, blocks: [{ type: 'text' }] },
     })
+  })
+
+  it('does not attach undefined replayState on an error finish', async () => {
+    const chunks: StreamChunk[] = [
+      { type: 'usage', usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 } },
+      {
+        type: 'finish',
+        reason: { kind: 'error', failure: { message: '400: invalid tool schema', code: 'INVALID_REQUEST' } },
+      },
+    ]
+    const result = await collect(filterHostedServerToolTraces(stream(chunks)))
+    expect(result).toEqual(chunks)
+    const finish = result.find(chunk => chunk.type === 'finish')
+    expect(finish !== undefined && 'replayState' in finish).toBe(false)
   })
 
   it('preserves a real client-side tool call and the tool-calls finish', async () => {
@@ -269,7 +323,7 @@ describe('native OAuth tools', () => {
   })
 
   it('gives Grok hosted search, X search, and image generation', () => {
-    const plan = nativePlan('xai')
+    const plan = nativePlan('xai', 'openai-responses')
     expect(plan?.hosted).toEqual([
       { type: 'web_search' },
       { type: 'x_search' },
@@ -278,39 +332,46 @@ describe('native OAuth tools', () => {
   })
 
   it('gives Codex hosted search and image generation', () => {
-    expect(nativePlan('openai-codex')?.hosted).toEqual([
+    expect(nativePlan('openai-codex', 'openai-codex-responses')?.hosted).toEqual([
       { type: 'web_search' },
       { type: 'image_generation' },
     ])
   })
 
   it('gives Claude the Anthropic server search tool only', () => {
-    expect(nativePlan('anthropic')?.hosted).toEqual([
+    expect(nativePlan('anthropic', 'anthropic-messages')?.hosted).toEqual([
       { type: 'web_search_20250305', name: 'web_search' },
     ])
   })
 
   it('does not invent hosted tools for Copilot, OpenRouter, or Kimi', () => {
-    expect(nativePlan('github-copilot')).toBeUndefined()
-    expect(nativePlan('openrouter')).toBeUndefined()
-    expect(nativePlan('kimi-coding')).toBeUndefined()
+    expect(nativePlan('github-copilot', 'openai-responses')).toBeUndefined()
+    expect(nativePlan('openrouter', 'openai-completions')).toBeUndefined()
+    expect(nativePlan('kimi-coding', 'anthropic-messages')).toBeUndefined()
   })
 
   it('maps harness routes back to the same plan', () => {
-    expect(nativePlanForRoute('pi-xai')?.providerId).toBe('xai')
-    expect(nativePlanForRoute('pi-openai-codex')?.providerId).toBe('openai-codex')
-    expect(nativePlanForRoute('deepseek-official')).toBeUndefined()
+    expect(nativePlanForRoute('pi-xai', 'openai-responses')?.providerId).toBe('xai')
+    expect(nativePlanForRoute('pi-openai-codex', 'openai-codex-responses')?.providerId).toBe('openai-codex')
+    expect(nativePlanForRoute('deepseek-official', 'openai-responses')).toBeUndefined()
+  })
+
+  it('requires the exact provider protocol before hiding DSH tools', () => {
+    expect(nativePlan('xai', 'openai-completions')).toBeUndefined()
+    expect(nativePlan('xai', undefined)).toBeUndefined()
+    expect(nativePlan('openai-codex', 'openai-responses')).toBeUndefined()
+    expect(nativePlan('anthropic', 'openai-completions')).toBeUndefined()
   })
 
   it('can disable image generation without dropping search', () => {
-    expect(nativePlan('xai', { enabled: true, image: false })?.hosted).toEqual([
+    expect(nativePlan('xai', 'openai-responses', { enabled: true, image: false })?.hosted).toEqual([
       { type: 'web_search' },
       { type: 'x_search' },
     ])
   })
 
   it('can turn the whole overlay off', () => {
-    expect(nativePlan('xai', { enabled: false, image: true })).toBeUndefined()
+    expect(nativePlan('xai', 'openai-responses', { enabled: false, image: true })).toBeUndefined()
   })
 
   it('strips DSH function web tools and prepends hosted tools', () => {
@@ -321,7 +382,7 @@ describe('native OAuth tools', () => {
         { type: 'function', name: 'web_search', parameters: { query: { type: 'string' } } },
         { type: 'function', name: 'web_fetch', parameters: { url: { type: 'string' } } },
       ],
-    }, 'xai')
+    }, 'xai', 'openai-responses')
     expect(next).toEqual({
       model: 'grok-4.6',
       tools: [
@@ -339,12 +400,12 @@ describe('native OAuth tools', () => {
       input: 'Return one JSON approval decision.',
     }
 
-    expect(applyNativeToolsToPayload(payload, 'xai')).toBe(payload)
+    expect(applyNativeToolsToPayload(payload, 'xai', 'openai-responses')).toBe(payload)
     expect(payload).not.toHaveProperty('tools')
   })
 
   it('attaches hosted tools when the caller explicitly supplies an empty tool list', () => {
-    expect(applyNativeToolsToPayload({ tools: [] }, 'xai')).toEqual({
+    expect(applyNativeToolsToPayload({ tools: [] }, 'xai', 'openai-responses')).toEqual({
       tools: [
         { type: 'web_search' },
         { type: 'x_search' },
@@ -353,12 +414,56 @@ describe('native OAuth tools', () => {
     })
   })
 
+  it('attaches hosted tools when filtering removed every DSH web tool and the serializer omits tools', async () => {
+    const prepared = prepareNativeToolRequest({
+      messages: [],
+      tools: [
+        { name: 'web_search', description: '', parameters: {} },
+        { name: 'web_fetch', description: '', parameters: {} },
+      ],
+    }, {}, 'xai', 'openai-responses')
+
+    expect(prepared.context.tools).toEqual([])
+    await expect(Promise.resolve(prepared.options.onPayload?.({ model: 'grok-4.6' }, {
+      id: 'grok-4.6', api: 'openai-responses',
+    } as never))).resolves.toEqual({
+      model: 'grok-4.6',
+      tools: [
+        { type: 'web_search' },
+        { type: 'x_search' },
+        { type: 'image_generation' },
+      ],
+    })
+  })
+
+  it('preserves flat and nested DSH web functions on unsupported protocols', () => {
+    const payload = {
+      tools: [
+        { type: 'function', name: 'web_search', parameters: {} },
+        { type: 'function', function: { name: 'web_fetch', parameters: {} } },
+      ],
+    }
+    expect(applyNativeToolsToPayload(payload, 'xai', 'openai-completions')).toBe(payload)
+    expect(applyNativeToolsToPayload(payload, 'xai', undefined)).toBe(payload)
+  })
+
+  it('keeps the Grok 4.6 Responses contract when native tools are disabled', () => {
+    const provider = harnessProvider(
+      requirePiLoginProvider('xai'),
+      { enabled: false, image: false },
+    )
+    expect(provider.getModels().find(model => model.id === 'grok-4.6')).toMatchObject({
+      api: 'openai-responses',
+      compat: { supportsLongCacheRetention: false },
+    })
+  })
+
   it('keeps a text-only request text-only when the provider serializer emits tools: []', async () => {
     const context = { messages: [] }
     const options: StreamOptions = {
       onPayload: (payload: unknown): unknown => payload,
     }
-    const prepared = prepareNativeToolRequest(context, options, 'openai-codex')
+    const prepared = prepareNativeToolRequest(context, options, 'openai-codex', 'openai-codex-responses')
 
     expect(prepared.context).toBe(context)
     expect(prepared.options).toBe(options)
@@ -375,7 +480,7 @@ describe('native OAuth tools', () => {
         { name: 'bash', description: '', parameters: {} },
         { name: 'web_search', description: '', parameters: {} },
       ],
-    }, {}, 'openai-codex')
+    }, {}, 'openai-codex', 'openai-codex-responses')
 
     expect(prepared.context.tools?.map(tool => tool.name)).toEqual(['bash'])
     await expect(Promise.resolve(prepared.options.onPayload?.({
@@ -395,13 +500,13 @@ describe('native OAuth tools', () => {
   it('does not duplicate hosted tools already on the payload', () => {
     const next = applyNativeToolsToPayload({
       tools: [{ type: 'web_search' }, { type: 'function', name: 'read' }],
-    }, 'openai-codex') as { tools: Record<string, unknown>[] }
+    }, 'openai-codex', 'openai-codex-responses') as { tools: Record<string, unknown>[] }
     expect(next.tools.filter(tool => tool.type === 'web_search')).toHaveLength(1)
     expect(next.tools.some(tool => tool.type === 'image_generation')).toBe(true)
   })
 
   it('leaves non-object payloads alone', () => {
-    expect(applyNativeToolsToPayload('raw', 'xai')).toBe('raw')
+    expect(applyNativeToolsToPayload('raw', 'xai', 'openai-responses')).toBe('raw')
   })
 
   it('does not treat a hosted web_search as a DSH function tool', () => {
@@ -417,12 +522,12 @@ describe('native OAuth tools', () => {
         { name: 'bash', description: '', parameters: {} },
         { name: 'web_search', description: '', parameters: {} },
       ],
-    }, 'xai')
+    }, 'xai', 'openai-responses')
     expect(filtered.tools?.map(tool => tool.name)).toEqual(['bash'])
   })
 
   it('rewrites the prompt assembly for an OAuth native route', () => {
-    const plan = nativePlan('xai')
+    const plan = nativePlan('xai', 'openai-responses')
     if (plan === undefined) throw new Error('xai plan missing')
     const next = maskDshWebAssembly({
       tools: [{ name: 'bash' }, { name: 'web_search' }, { name: 'web_fetch' }],
@@ -444,7 +549,7 @@ describe('native OAuth tools', () => {
     const onPayload = wrapOnPayload((payload) => {
       seen.push(payload)
       return { wrapped: true, payload }
-    }, 'anthropic', DEFAULT_NATIVE_TOOL_POLICY)
+    }, 'anthropic', 'anthropic-messages', DEFAULT_NATIVE_TOOL_POLICY)
     if (onPayload === undefined) throw new Error('onPayload missing')
     const result = await onPayload({ tools: [{ type: 'function', name: 'web_search' }] }, {
       id: 'claude-opus-4-6',

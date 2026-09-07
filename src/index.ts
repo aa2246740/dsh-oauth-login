@@ -9,7 +9,7 @@ import type {} from '@deepseek-ai/dsh-host-webserver'
 import type { AdapterRegistrationHandle } from '@deepseek-ai/dsh-llm'
 import { createPiLoginAdapter } from './adapter.ts'
 import { registerPiLoginAuthRoutes } from './auth-routes.ts'
-import { piLoginRoutes } from './catalog.ts'
+import { piLoginProviderByRoute, piLoginRoutes } from './catalog.ts'
 import { maskDshWebAssembly, nativePlanForRoute } from './native-tools.ts'
 import { OAUTH_REFRESH_POLL_MS } from './oauth-refresh.ts'
 import type { Config } from './plugin-config.ts'
@@ -22,7 +22,7 @@ type NativeAssembly = {
 }
 
 type NativeAssembleContext = {
-  agent?: { options?: { provider?: string } }
+  agent?: { options?: { provider?: string; model?: string } }
 }
 
 declare module '@deepseek-ai/cordis' {
@@ -170,7 +170,13 @@ export function apply(ctx: Context, config: Config): void {
   ctx.inject(['systemPrompt'], promptCtx => {
     promptCtx.on('system-prompt/assemble', async (_assembly, context, next) => {
       const assembled = await next()
-      const plan = nativePlanForRoute(context.agent?.options?.provider, session.native)
+      const route = context.agent?.options?.provider
+      const modelId = context.agent?.options?.model
+      const spec = route === undefined ? undefined : piLoginProviderByRoute(route)
+      const api = spec === undefined || modelId === undefined
+        ? undefined
+        : session.visibleModels(spec.id).find(model => model.id === modelId)?.api
+      const plan = nativePlanForRoute(route, api, session.native)
       return plan === undefined ? assembled : maskDshWebAssembly(assembled, plan)
     })
   })

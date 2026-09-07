@@ -41,8 +41,16 @@ export function catalogProvider(id: string): Provider {
  * Official OpenRouter generation currently sets `reasoning: true` and no map.
  */
 function overlayExtraModel(model: Model<Api>, extra: Model<Api>): Model<Api> {
-  if (extra.thinkingLevelMap === undefined || model.thinkingLevelMap !== undefined) return model
-  return { ...model, reasoning: extra.reasoning, thinkingLevelMap: extra.thinkingLevelMap }
+  const transport = model.provider === 'xai'
+    && model.id === 'grok-4.6'
+    && extra.api === 'openai-responses'
+    ? { api: extra.api, compat: extra.compat }
+    : {}
+  const reasoning = extra.thinkingLevelMap !== undefined && model.thinkingLevelMap === undefined
+    ? { reasoning: extra.reasoning, thinkingLevelMap: extra.thinkingLevelMap }
+    : {}
+  if (Object.keys(transport).length === 0 && Object.keys(reasoning).length === 0) return model
+  return { ...model, ...transport, ...reasoning }
 }
 
 export function harnessModels(spec: PiLoginProvider, catalog?: OpenRouterCatalog): Model<Api>[] {
@@ -95,7 +103,7 @@ export function harnessProvider(
     auth: { ...base.auth, apiKey: harnessApiKeyAuth(spec.displayName) },
     getModels: () => harnessModels(spec, catalog),
     stream: (model, context, options) => {
-      const request = prepareNativeToolRequest(context, options ?? {}, spec.id, native)
+      const request = prepareNativeToolRequest(context, options ?? {}, spec.id, model.api, native)
       const guarded = spec.id === 'openrouter'
         ? prepareOpenRouterOptions(model, request.options, catalog) : request.options
       return base.stream(
@@ -108,7 +116,7 @@ export function harnessProvider(
       )
     },
     streamSimple: (model, context, options) => {
-      const request = prepareNativeToolRequest(context, options ?? {}, spec.id, native)
+      const request = prepareNativeToolRequest(context, options ?? {}, spec.id, model.api, native)
       const guarded = spec.id === 'openrouter'
         ? prepareOpenRouterOptions(model, request.options, catalog) : request.options
       return base.streamSimple(

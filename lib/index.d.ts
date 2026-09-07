@@ -121,11 +121,12 @@ interface NativeToolPolicy {
 declare const DEFAULT_NATIVE_TOOL_POLICY: NativeToolPolicy;
 interface NativeToolPlan {
   readonly providerId: string;
+  readonly api: string;
   readonly hosted: readonly Record<string, unknown>[];
   readonly guidance: string;
 }
-declare function nativePlan(providerId: string, policy?: NativeToolPolicy): NativeToolPlan | undefined;
-declare function nativePlanForRoute(route: string | undefined, policy?: NativeToolPolicy): NativeToolPlan | undefined;
+declare function nativePlan(providerId: string, api: string | undefined, policy?: NativeToolPolicy): NativeToolPlan | undefined;
+declare function nativePlanForRoute(route: string | undefined, api: string | undefined, policy?: NativeToolPolicy): NativeToolPlan | undefined;
 /**
  * xAI's Responses stream currently exposes server-executed X Search details
  * as custom tool calls. The outer `xs_call-*` id distinguishes those traces
@@ -151,7 +152,7 @@ declare function isHostedSearchReasoningReplay(block: unknown): boolean;
 declare function filterHostedServerToolTraces(source: AsyncIterable<StreamChunk>): AsyncGenerator<StreamChunk>;
 /** @deprecated Use {@link filterHostedServerToolTraces}. */
 declare const filterXaiServerToolTraces: typeof filterHostedServerToolTraces;
-declare function applyNativeToolsToPayload(payload: unknown, providerId: string, policy?: NativeToolPolicy): unknown;
+declare function applyNativeToolsToPayload(payload: unknown, providerId: string, api: string | undefined, policy?: NativeToolPolicy): unknown;
 /**
  * Prepare one provider request as a single unit.
  *
@@ -160,7 +161,7 @@ declare function applyNativeToolsToPayload(payload: unknown, providerId: string,
  * and similar utility traffic), so its payload hook must stay untouched even
  * when the provider serializer later emits `tools: []`.
  */
-declare function prepareNativeToolRequest<TOptions extends StreamOptions>(context: Context, options: TOptions, providerId: string, policy?: NativeToolPolicy): {
+declare function prepareNativeToolRequest<TOptions extends StreamOptions>(context: Context, options: TOptions, providerId: string, api: string | undefined, policy?: NativeToolPolicy): {
   context: Context;
   options: TOptions & StreamOptions;
 };
@@ -465,6 +466,7 @@ type NativeAssembleContext = {
   agent?: {
     options?: {
       provider?: string;
+      model?: string;
     };
   };
 };

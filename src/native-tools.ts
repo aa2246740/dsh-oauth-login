@@ -56,6 +56,7 @@ export const DEFAULT_NATIVE_TOOL_POLICY: NativeToolPolicy = {
 
 export interface NativeToolPlan {
   readonly providerId: string
+  readonly api: string
   readonly hosted: readonly Record<string, unknown>[]
   readonly guidance: string
 }
@@ -84,13 +85,15 @@ function anthropicSearch(): Record<string, unknown> {
 
 export function nativePlan(
   providerId: string,
+  api: string | undefined,
   policy: NativeToolPolicy = DEFAULT_NATIVE_TOOL_POLICY,
 ): NativeToolPlan | undefined {
   if (!policy.enabled) return undefined
-  switch (providerId) {
-    case 'xai':
+  switch (`${providerId}:${api ?? ''}`) {
+    case 'xai:openai-responses':
       return {
         providerId,
+        api: 'openai-responses',
         hosted: [
           responsesSearch(),
           responsesXSearch(),
@@ -98,18 +101,20 @@ export function nativePlan(
         ],
         guidance: policy.image ? SEARCH_AND_IMAGE_GUIDANCE : SEARCH_GUIDANCE,
       }
-    case 'openai-codex':
+    case 'openai-codex:openai-codex-responses':
       return {
         providerId,
+        api: 'openai-codex-responses',
         hosted: [
           responsesSearch(),
           ...policy.image ? [responsesImage()] : [],
         ],
         guidance: policy.image ? SEARCH_AND_IMAGE_GUIDANCE : SEARCH_GUIDANCE,
       }
-    case 'anthropic':
+    case 'anthropic:anthropic-messages':
       return {
         providerId,
+        api: 'anthropic-messages',
         hosted: [anthropicSearch()],
         guidance: SEARCH_GUIDANCE,
       }
@@ -120,11 +125,12 @@ export function nativePlan(
 
 export function nativePlanForRoute(
   route: string | undefined,
+  api: string | undefined,
   policy: NativeToolPolicy = DEFAULT_NATIVE_TOOL_POLICY,
 ): NativeToolPlan | undefined {
   if (route === undefined) return undefined
   const spec = piLoginProviderByRoute(route)
-  return spec === undefined ? undefined : nativePlan(spec.id, policy)
+  return spec === undefined ? undefined : nativePlan(spec.id, api, policy)
 }
 
 export function isDshWebToolName(name: string): boolean {
@@ -298,10 +304,13 @@ export async function* filterHostedServerToolTraces(
     if (chunk.type === 'finish') {
       for (const index of [...reasoning.keys()]) yield* closeReasoning(index)
       const forceStop = chunk.reason.kind === 'tool-calls' && dropped.size > 0 && keptToolCalls === 0
+      const replayState = filterPiReplayState(chunk.replayState, dropped, forceStop)
+      // DSH session.append rejects explicit `undefined` (lossless JSON). An
+      // error finish has no replay envelope; do not mint `replayState: undefined`.
       yield {
-        ...chunk,
-        ...(forceStop ? { reason: { kind: 'stop' as const } } : {}),
-        replayState: filterPiReplayState(chunk.replayState, dropped, forceStop),
+        type: 'finish' as const,
+        reason: forceStop ? { kind: 'stop' as const } : chunk.reason,
+        ...replayState === undefined ? {} : { replayState },
       }
       continue
     }
@@ -336,9 +345,10 @@ export function hostedToolKey(tool: Record<string, unknown>): string {
 export function applyNativeToolsToPayload(
   payload: unknown,
   providerId: string,
+  api: string | undefined,
   policy: NativeToolPolicy = DEFAULT_NATIVE_TOOL_POLICY,
 ): unknown {
-  const plan = nativePlan(providerId, policy)
+  const plan = nativePlan(providerId, api, policy)
   if (plan === undefined || !isRecord(payload) || !Array.isArray(payload.tools)) return payload
   const current = payload.tools
   const kept = current.filter(tool => !isDshWebFunctionTool(tool))
@@ -357,11 +367,19 @@ export function applyNativeToolsToPayload(
 export function wrapOnPayload(
   existing: StreamOptions['onPayload'],
   providerId: string,
+  api: string | undefined,
   policy: NativeToolPolicy = DEFAULT_NATIVE_TOOL_POLICY,
 ): StreamOptions['onPayload'] {
-  if (nativePlan(providerId, policy) === undefined) return existing
+  if (nativePlan(providerId, api, policy) === undefined) return existing
   return async (payload, model) => {
-    const injected = applyNativeToolsToPayload(payload, providerId, policy)
+    // This hook is installed only for an agent request whose context declared
+    // tools. If DSH web tools were the whole list, Pi may omit `tools` after
+    // they are filtered; materialize the list so hosted tools still reach the
+    // provider. Utility/text-only requests never install this hook.
+    const requestPayload = isRecord(payload) && !('tools' in payload)
+      ? { ...payload, tools: [] }
+      : payload
+    const injected = applyNativeToolsToPayload(requestPayload, providerId, api, policy)
     if (existing === undefined) return injected
     return await existing(injected, model)
   }
@@ -370,9 +388,10 @@ export function wrapOnPayload(
 export function filterPiContext(
   context: PiContext,
   providerId: string,
+  api: string | undefined,
   policy: NativeToolPolicy = DEFAULT_NATIVE_TOOL_POLICY,
 ): PiContext {
-  if (nativePlan(providerId, policy) === undefined || context.tools === undefined) return context
+  if (nativePlan(providerId, api, policy) === undefined || context.tools === undefined) return context
   return {
     ...context,
     tools: context.tools.filter(tool => !isDshWebToolName(tool.name)),
@@ -391,14 +410,15 @@ export function prepareNativeToolRequest<TOptions extends StreamOptions>(
   context: PiContext,
   options: TOptions,
   providerId: string,
+  api: string | undefined,
   policy: NativeToolPolicy = DEFAULT_NATIVE_TOOL_POLICY,
 ): { context: PiContext; options: TOptions & StreamOptions } {
-  if (context.tools === undefined || nativePlan(providerId, policy) === undefined) {
+  if (context.tools === undefined || nativePlan(providerId, api, policy) === undefined) {
     return { context, options }
   }
-  const onPayload = wrapOnPayload(options?.onPayload, providerId, policy)
+  const onPayload = wrapOnPayload(options?.onPayload, providerId, api, policy)
   return {
-    context: filterPiContext(context, providerId, policy),
+    context: filterPiContext(context, providerId, api, policy),
     options: onPayload === options.onPayload
       ? options
       : Object.assign({}, options, { onPayload }),

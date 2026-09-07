@@ -117,7 +117,11 @@ class PiLoginAdapter extends PiAiAdapter {
           ? String(options.sessionId)
           : undefined,
       ))
-      const plan = this.native.enabled ? nativePlanForRoute(options.provider, this.native) : undefined
+      const spec = piLoginProviderByRoute(options.provider)
+      const api = spec === undefined
+        ? undefined
+        : this.session.visibleModels(spec.id).find(model => model.id === options.model)?.api
+      const plan = nativePlanForRoute(options.provider, api, this.native)
       const filtered = plan === undefined ? raw : filterHostedServerToolTraces(raw)
       const attachments = this.native.image ? this.resolveAttachments() : undefined
       const decorated = attachments === undefined
