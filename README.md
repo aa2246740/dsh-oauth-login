@@ -2,48 +2,32 @@
 
 中文 | [English](README.en.md)
 
-把 ChatGPT、Claude、Grok、Copilot、OpenRouter、Kimi 的 OAuth 登录和智谱 GLM Coding Plan 接到 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)。复用 Pi Agent 的 provider 适配器，凭据只写 DSH 自己的 `$DSH_HOME/.dsh-oauth-auth.json`。
+把 ChatGPT、Claude、Grok、Copilot、OpenRouter、Kimi 的 OAuth 登录和智谱 GLM Coding Plan 接到 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)。凭据只写 `$DSH_HOME/.dsh-oauth-auth.json`。
 
-厂商公开 OAuth 就按其流程登录；智谱使用官方 Coding Plan API Key。官方 `codex login`、Claude Code、`grok` CLI、Pi Agent 的 `~/.pi/agent/auth.json`，这里不读也不写。
+厂商公开 OAuth 就按其流程登录。智谱用官方 Coding Plan API Key。官方 `codex login`、Claude Code、`grok` CLI、Pi Agent 的 `~/.pi/agent/auth.json`，这里不读也不写。
 
-## 长什么样
+入口在 **设置 → 订阅登录**。
 
-下面保留的是早期 OAuth-only 版本装进 `dsh web` 后的实拍截图，不是设计稿。当前 0.2.0 入口已改为 **设置 → 订阅登录**，并新增智谱套餐接入和 OpenRouter 模型同步；旧截图不展示这些新增功能。
+![设置里的厂商列表](docs/screenshots/01-providers-signed-out.png)
 
-设置页里的语言跟着 Harness，这台机器当时是中文。
+![Copilot 等待授权](docs/screenshots/05-copilot-sign-in.gif)
 
-![设置里的厂商列表，都还没登录](docs/screenshots/01-providers-signed-out.png)
+![Copilot 正在等授权码](docs/screenshots/03-copilot-signing-in.png)
 
-点 GitHub Copilot 的「登录」。插件向 GitHub 要 device code，卡片变成「正在等待授权」，并给出 `github.com/login/device`。官方 CLI 的登录文件不会被创建。
+![混合登录状态](docs/screenshots/04-mixed-live-states.png)
 
-![点登录之后，Copilot 进入等待授权](docs/screenshots/05-copilot-sign-in.gif)
-
-![Copilot 正在等授权码，其余厂商仍未登录](docs/screenshots/03-copilot-signing-in.png)
-
-Grok 那张绿点是写进 `$DSH_HOME/.dsh-oauth-auth.json` 的占位授权，用来拍「已登录 / 退出」。不是真的 xAI 会话，文件内容没有出现在任何截图里。
-
-![Grok 已登录，Copilot 仍在等授权](docs/screenshots/04-mixed-live-states.png)
-
-命令行读的也是 DSH 这份 store，不是官方 CLI 的登录文件。`status` 不打印 token。Codex 未登录时退出码是 1。`ls` 用来确认 `~/.pi`、`~/.codex`、`~/.claude` 没被碰过。
-
-![CLI status、独立 store、未登录时退出 1](docs/screenshots/06-cli-status-store.png)
+![CLI status 读的是 DSH 这份 store](docs/screenshots/06-cli-status-store.png)
 
 ## 安装
 
 需要 Node 22.19+，以及能跑起来的 DeepSeek Harness。
 
 ```sh
-npx @deepseek-ai/dsh web
-```
-
-另开一个终端，在 Harness 旁边装这个插件。`file:` 前缀必须留着。
-
-```sh
 git clone https://github.com/aa2246740/dsh-oauth-login.git
 dsh plugin --profile web add file:./dsh-oauth-login
 ```
 
-写成 `./dsh-oauth-login` 会被装成符号链接。本插件把 DSH 运行时当成 peer dependency，必须用 `file:` 拷进 profile，Node 才能从那边解析依赖。
+`file:` 前缀必须留着。写成 `./dsh-oauth-login` 会被装成符号链接，peer 依赖解析不到。
 
 重启 `dsh web`。打开 **设置 → 订阅登录**。对话里选 `pi-…` 路由。
 
@@ -54,7 +38,7 @@ dsh plugin --profile web exec dsh-oauth-login login zai-coding-cn
 dsh plugin --profile web exec dsh-oauth-login status
 ```
 
-旧版 DSH 的 `.pi-login-auth.json` 只在下次写入时迁到新文件名，不会当成 Pi Agent 的登录文件。
+`status` 不打印 token。旧版 `.pi-login-auth.json` 只在下次写入时迁到新文件名。
 
 ## 支持哪些登录
 
@@ -68,53 +52,17 @@ dsh plugin --profile web exec dsh-oauth-login status
 | Kimi For Coding | `pi-kimi-coding` | `kimi-coding` | OAuth |
 | 智谱 GLM Coding Plan | `pi-zai-coding-cn` | `zai-coding-cn` | Plan API Key |
 
-Radius 没做。它要自己配网关。
+Radius 没做。
 
-## OpenRouter 模型同步与免费筛选
+OpenRouter 登录成功后拉官方模型目录，已登录时大约每 15 分钟同步一次。模型菜单可以筛「仅免费」。目录缓存在 `$DSH_HOME/.dsh-oauth-openrouter-models.json`，不含凭据。细节见 [OpenRouter 模型同步](docs/openrouter-sync.md)。
 
-OAuth 登录成功后自动拉取官方模型目录；已登录时，DSH 服务每 **15 分钟**
-同步一次。重启先显示本地缓存，过期再更新。也可在模型菜单或
-**设置 → 订阅登录 → OpenRouter** 点击**刷新模型**，手动刷新间隔至少 60 秒。
+智谱点「连接套餐」会打开官方 [Coding Plan 个人页](https://bigmodel.cn/coding-plan/personal/overview)，把 Key 贴回本机 DSH。接口是 `https://open.bigmodel.cn/api/coding/paas/v4`。插件不读 BigModel Cookie。从 0.2.1 起同时提供 `glm-5.3` 和 `glm-5.3-flash`。
 
-模型菜单支持**全部 / 仅免费**，按官方实时价格标注**免费 · 有限额**，
-并显示工具调用能力、上下文长度、上次同步时间。同步失败保留旧列表并标为
-缓存；新增模型会进入实际调用适配器，后台更新不会替你切换当前模型。
-
-免费不代表无限调用，仍受 OpenRouter 速率、每日额度和供应商容量限制。
-免费请求会使用零价格上限，禁用付费模型回退及已知收费插件；曾标为免费的
-型号变成收费或下架后，不会静默按付费方式调用。账户/组织强制启用的收费
-插件不受 DSH 控制，请先在 OpenRouter 关闭这类强制规则。
-
-目录缓存不含凭据，独立保存为 `$DSH_HOME/.dsh-oauth-openrouter-models.json`。
-详细边界与验证约定见 [OpenRouter 模型同步](docs/openrouter-sync.md)。
-
-## 智谱 GLM Coding Plan
-
-智谱公开的 Coding Plan 接入方式是套餐专用 API Key，不是面向第三方插件的
-网页 OAuth。点击智谱卡片的**连接套餐**后，插件会打开官方
-[Coding Plan 个人页](https://bigmodel.cn/coding-plan/personal/overview)，再请你把
-Key 粘贴到本机 DSH 页面。官方接口为
-`https://open.bigmodel.cn/api/coding/paas/v4`。
-
-插件不会读取 BigModel Cookie、浏览器存储、网页内容，也不会从其他应用
-提取 Key。只有你选择 `pi-zai-coding-cn` 路由时，保存的 Key 才会交给 Pi 的
-`zai-coding-cn` 适配器发送。
-从 0.2.1 起，模型列表同时提供 `glm-5.3` 普通版（纯文本）和
-`glm-5.3-flash`（文本与图片），两者可以独立选择，不会互相替换。
-默认仍为 Flash，已有会话的模型选择不变，也保留 Coding Plan 的旧模型。
-插件补齐尚未进入 Pi 目录的模型描述：两者均为 1M 上下文，支持
-`low` / `high` / `max` 思考强度，默认 `max`。详见
-[智谱官方模型切换说明](https://docs.bigmodel.cn/cn/coding-plan/latest-model)。
-
-## 登录文件在哪
-
-OAuth 授权与 Plan API Key 只写 `$DSH_HOME/.dsh-oauth-auth.json`，权限是当前用户可读写。不要把这份文件、API Key、回调 URL、授权码或 token 贴到公开 Issue。私下报告见 [SECURITY.md](SECURITY.md)。
+不要把这份登录文件、API Key、回调 URL、授权码或 token 贴到公开 Issue。私下报告见 [SECURITY.md](SECURITY.md)。
 
 ## 厂商自己的搜索和出图
 
-官方 DSH 会注册 `web_search`，再经 `ctx.web` 打出去，默认又用 `DEEPSEEK_API_KEY` 走一轮 DeepSeek Messages。OAuth 账号自己的 hosted tool 就被盖住了。
-
-在这些路由上，插件会从模型可见 schema 里拿掉 DSH 的 `web_search` / `web_fetch`，改挂厂商自己的工具。
+这些路由上，插件会拿掉 DSH 的 `web_search` / `web_fetch`，改挂厂商自己的工具：
 
 | 路由 | Hosted tools |
 |---|---|
@@ -122,13 +70,7 @@ OAuth 授权与 Plan API Key 只写 `$DSH_HOME/.dsh-oauth-auth.json`，权限是
 | `pi-openai-codex` | `web_search`、`image_generation` |
 | `pi-anthropic` | `web_search_20250305` |
 
-Copilot、OpenRouter、Kimi、智谱不挂 hosted tool。OpenRouter 免费请求另有零价格和收费插件保护，见上文；DeepSeek 官方对话不改。
-
-这些工具走的是该厂商的订阅 / tool 额度，不再要 Exa、Perplexity 或 DeepSeek Search。服务端搜索痕迹不会再当成 DSH 工具去跑。Grok 搜索 hop 里的空 Think，以及正文开始之后才冒出来的旁白 Think，会从流里丢掉。托管出图写入附件库，显示在助手那一轮。
-
-Hosted tools 是这一次请求的能力。只有调用方带了 `tools` 列表，插件才会去做去重和注入。自动审批、标题生成这类不带 `tools` 的纯文本调用保持纯文本。
-
-要继续用 DSH 自己的搜索：
+Copilot、OpenRouter、Kimi、智谱不挂 hosted tool。要继续用 DSH 自己的搜索：
 
 ```yaml
 - id: llm-oauth-login
@@ -139,59 +81,8 @@ Hosted tools 是这一次请求的能力。只有调用方带了 `tools` 列表�
 
 `nativeImage: false` 只留搜索，去掉出图。
 
-## 模型失败时
-
-插件不另写一套重试。Chat 使用官方 `dsh-llm-retry` 的次数、退避和取消机制。插件兼容已确认的分类缺口：Codex 路由的 `WebSocket error` 及已知可恢复关闭码从 `PI_AI_ERROR` 修正为 `TRANSPORT`，服务器 overloaded 文案修正为 `SERVER`，智谱国内 Coding Plan 路由的 HTTP 429 / 业务码 `1310` 从 `RATE_LIMIT` 修正为 `QUOTA`。流内错误和抛出的错误使用同一规则，其他路由与已明确分类的错误保持原样。
-
-正常 Agent 请求使用 `prepareCall` 固定模型与提供方状态，直接流式调用使用 `stream`。两个入口均应用上述错误兼容；已准备请求继续使用原始 `prepared.stream`，不会为了补重试而重新选择提供方或丢失请求快照。
-
-| 码 | 通常是什么 | 怎么做 |
-|---|---|---|
-| `RATE_LIMIT` | 请求限流或高峰。很多 HTTP 429 落在这里。 | 等完默认五次自动重试，再发一条。 |
-| `QUOTA` | 套餐、用量窗、余额。 | 再试也补不回来，去查厂商套餐。 |
-| `TIMEOUT` / `TRANSPORT` | 空闲断流或网络。 | 先按原有预算自动恢复；耗尽后检查网络。 |
-| `SERVER` | 对端 5xx / 部分 overloaded。 | 和其他暂时故障一样。 |
-| `AUTH` / `MISSING_CREDENTIAL` | 没登录、没有 Plan Key 或凭据被拒。 | 设置 → 订阅登录。Chat 有时把 AUTH 显示成 “API key is invalid”。 |
-
-429 不等于繁忙，也不等于额度耗尽。智谱 `1305` 高峰繁忙仍按 `RATE_LIMIT` 自动重试；`1310` 周/月额度耗尽按 `QUOTA` 停止短间隔自动重试并显示额度提示。插件只读取该路由错误 JSON 的顶层业务码，不按请求示例、嵌套字段或含糊文案猜测额度状态。
-
-RC8 默认对暂时故障自动重试五次，然后本轮结束。Continue 失败或输入框卡住，开新对话。
-
-不另外设置 WS 重试次数。Pi AI 0.82.1 在首个事件前的 WS 故障可在同一次调用内转 SSE；首个事件后的传输故障会记住该会话需要 SSE，再由 DSH 的下一次重试接上。保留同一个会话 ID，已降级的会话不会每条消息又从 WS 开始。不会为了凑满五次而延迟 SSE 降级。
-
-要加大次数而不改插件代码，给 `llm-oauth-login` 行加配置：
-
-```yaml
-- id: llm-oauth-login
-  name: dsh-oauth-login
-  config:
-    retryPolicy:
-      mode: normal
-      maxRetries: 7
-      backoff:
-        initialDelayMs: 1000
-        maxDelayMs: 30000
-        jitterRatio: 0.1
-```
-
-`mode: always` 会把每一种失败都重试到成功或取消，可能烧额度。Creator Mode / 宿主模型的超时走你在对话里选的那条路由，不是这个插件。
-
-## 代理
-
-在 **设置 → 订阅登录 → 网络代理** 中分别配置 HTTP 和 WebSocket。每项有独立开关、地址和端口；地址默认填入 `http://127.0.0.1`，端口留空供用户填写。只影响本插件，不修改系统代理、进程环境变量、DSH 核心或 Pi AI 依赖源码。
-
-| 设置 | 行为 |
-|---|---|
-| 开启并填写端口 | 使用指定的 HTTP(S) CONNECT 代理，优先于环境变量和自动发现；连接失败不会偷偷直连。 |
-| 开启、默认地址且端口留空 | 保留原有自动发现：环境变量 → `DSH_OAUTH_PROXY` → 可用的 macOS 系统代理 → 经验证的本机端口 → 直连。不会默认连接 80 端口。 |
-| 关闭 | 该协议直接连接，即使进程里存在代理变量；保存的地址保留。 |
-
-例如本机 **HTTP / 混合代理端口为 45678** 时，两项都可填地址 `http://127.0.0.1`、端口 `45678` 并开启。WS 使用代理不等于关闭或强制启用 WS；降级后的 SSE 使用 HTTP 那一项。纯 SOCKS 端口不适用于这些设置。
-
-保存后用于新请求；正在进行的调用不被中断。修改 WS 代理后，新调用会关闭旧的会话 WS 连接并重新选路，但不会清除已有 SSE 降级状态。首次升级服务端插件仍需重启 DSH，之后保存页面设置不需要重启。代理连通能减少网络故障，不能保证上游永不繁忙或断连。
-
-配置单独保存在凭据文件旁的 `.dsh-oauth-proxy.json`，不改 OAuth 凭据文件。更多说明见 [网络代理与恢复机制](docs/network-proxy.md)。
+Chat 失败重试走官方 `dsh-llm-retry`。429 不等于额度耗尽。设置 → 订阅登录 → 网络代理只影响本插件。
 
 ## 许可
 
-Apache-2.0。这是社区插件，和 DeepSeek、Pi Agent 以及上面这些 OAuth 厂商都没有隶属关系。
+Apache-2.0。见 [LICENSE](LICENSE)。
