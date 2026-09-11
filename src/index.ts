@@ -164,7 +164,7 @@ export function apply(ctx: Context, config: Config): void {
     void session.refreshStoredGrants().catch(() => { /* Next auth poll retries. */ })
     return () => clearInterval(timer)
   }, 'dsh-oauth-login: refresh oauth grants')
-  ctx.inject(['webServer'], webCtx => {
+  ctx.inject(['webServer', 'connection'], webCtx => {
     registerPiLoginAuthRoutes(webCtx, session, { onAuthChanged: refreshRoutes })
   })
   ctx.inject(['systemPrompt'], promptCtx => {

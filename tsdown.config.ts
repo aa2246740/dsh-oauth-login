@@ -1,5 +1,6 @@
-import { existsSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { defineConfig } from 'tsdown'
 
@@ -10,8 +11,18 @@ const nodeExternal = [
   'react/jsx-runtime',
 ]
 
-const harness = process.env.DSHX_HARNESS
-if (harness === undefined) throw new Error('Set DSHX_HARNESS to the checkout used for this build.')
+function resolveHarness(): string {
+  const configured = process.env.DSHX_HARNESS?.trim()
+  if (configured) return resolve(configured)
+  const configPath = join(homedir(), '.config/dshx/harness')
+  const recorded = existsSync(configPath) ? readFileSync(configPath, 'utf8').trim() : undefined
+  if (!recorded) {
+    throw new Error('dshx client build requires a Harness root from DSHX_HARNESS or ~/.config/dshx/harness')
+  }
+  return resolve(recorded)
+}
+
+const harness = resolveHarness()
 const adapter = resolve(harness, 'tools/dshx/src/client-build.js')
 if (!existsSync(adapter)) throw new Error('DSHX externalClientBundle adapter is missing.')
 const { externalClientBundle } = await import(pathToFileURL(adapter).href)

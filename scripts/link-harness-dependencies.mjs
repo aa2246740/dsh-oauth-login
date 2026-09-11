@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, realpathSync, readFileSync, symlinkSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, realpathSync, readFileSync, symlinkSync, unlinkSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 
@@ -28,6 +28,24 @@ const shared = {
   '@deepseek-ai/dsh-llm-pi-ai': 'packages/llm/llm-pi-ai',
   '@deepseek-ai/dsh-timeout': 'packages/util/timeout',
 }
+function replaceSymlinkWithDir(path) {
+  try {
+    if (lstatSync(path).isSymbolicLink()) unlinkSync(path)
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error
+  }
+  mkdirSync(path, { recursive: true })
+}
+
+function forceSymlink(destination, target) {
+  try {
+    unlinkSync(destination)
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error
+  }
+  symlinkSync(target, destination)
+}
+
 function link(name, target) {
   const destination = join(local, name)
   mkdirSync(dirname(destination), { recursive: true })
@@ -43,17 +61,17 @@ const rootRequire = createRequire(join(root, 'package.json'))
 const clientRequire = createRequire(join(root, 'packages/client/ui-conversation/package.json'))
 link('@earendil-works/pi-ai', join(root, 'packages/llm/llm-pi-ai/node_modules/@earendil-works/pi-ai'))
 link('undici', join(root, 'packages/web/web-fetch-http/node_modules/undici'))
+replaceSymlinkWithDir(join(local, '@types'))
+replaceSymlinkWithDir(join(local, '.bin'))
 for (const name of ['@types/react', 'react']) link(name, dirname(clientRequire.resolve(`${name}/package.json`)))
 for (const name of ['@types/node', 'tsdown', 'typescript', 'vitest']) {
   link(name, dirname(rootRequire.resolve(`${name}/package.json`)))
 }
-mkdirSync(join(local, '.bin'), { recursive: true })
 for (const name of ['tsdown', 'typescript', 'vitest']) {
   const pkg = JSON.parse(readFileSync(join(local, name, 'package.json'), 'utf8'))
   const bins = typeof pkg.bin === 'string' ? { [name]: pkg.bin } : pkg.bin
   for (const [command, path] of Object.entries(bins)) {
-    const target = join(local, '.bin', command)
-    if (!existsSync(target)) symlinkSync(join(local, name, path), target)
+    forceSymlink(join(local, '.bin', command), join(local, name, path))
   }
 }
 console.log('Development dependencies linked to the selected Harness; no package download or Harness mutation.')

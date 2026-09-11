@@ -179,6 +179,7 @@ export function createPiLoginAdapter(
           ...requestImageLimits,
           retryPolicy,
           configuredMaxTokens: new Map(),
+          modelErrors: new Map(),
           piProvider: session.provider(spec.id),
         })
       }
