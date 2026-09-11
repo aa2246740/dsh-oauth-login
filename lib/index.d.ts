@@ -1,5 +1,5 @@
 import { LlmFailure, Message, RetryPolicyConfig, StreamChunk } from "@deepseek-ai/dsh-llm";
-import { Api, AuthInteraction, Context, Credential, CredentialInfo, CredentialStore, Model, MutableModels, Provider, StreamOptions } from "@earendil-works/pi-ai";
+import { Api, AuthInteraction, AuthOperationOptions, Context, Credential, CredentialInfo, CredentialStore, Model, MutableModels, Provider, StreamOptions } from "@earendil-works/pi-ai";
 import { PiAiAdapter } from "@deepseek-ai/dsh-llm-pi-ai";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { EnvHttpProxyAgent } from "undici";
@@ -173,10 +173,10 @@ declare class PiLoginCredentialStore implements CredentialStore {
   readonly legacyFilename: string | undefined;
   constructor(filename?: string);
   private readDocument;
-  read(providerId: string): Promise<Credential | undefined>;
-  list(): Promise<readonly CredentialInfo[]>;
-  modify(providerId: string, fn: (current: Credential | undefined) => Promise<Credential | undefined>): Promise<Credential | undefined>;
-  delete(providerId: string): Promise<void>;
+  read(providerId: string, options?: AuthOperationOptions): Promise<Credential | undefined>;
+  list(options?: AuthOperationOptions): Promise<readonly CredentialInfo[]>;
+  modify(providerId: string, fn: (current: Credential | undefined) => Promise<Credential | undefined>, options?: AuthOperationOptions): Promise<Credential | undefined>;
+  delete(providerId: string, options?: AuthOperationOptions): Promise<void>;
 }
 //#endregion
 //#region src/openrouter-types.d.ts

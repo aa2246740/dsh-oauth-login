@@ -6,7 +6,7 @@
 
 import { mkdir, readFile, rm, stat } from 'node:fs/promises'
 import { basename, dirname, join, resolve } from 'node:path'
-import type { Credential, CredentialInfo, CredentialStore, ProviderEnv } from '@earendil-works/pi-ai'
+import type { AuthOperationOptions, Credential, CredentialInfo, CredentialStore, ProviderEnv } from '@earendil-works/pi-ai'
 import { withFileLock, writeFileAtomic } from '@deepseek-ai/dsh-atomic-write'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
 import { PI_LOGIN_PROVIDERS } from './catalog.ts'
@@ -164,13 +164,18 @@ export class PiLoginCredentialStore implements CredentialStore {
     return { version: AUTH_FORMAT_VERSION, credentials: {} }
   }
 
-  async read(providerId: string): Promise<Credential | undefined> {
+  async read(providerId: string, options?: AuthOperationOptions): Promise<Credential | undefined> {
+    options?.signal?.throwIfAborted()
     const credential = (await this.readDocument()).credentials[providerId]
+    options?.signal?.throwIfAborted()
     return credential === undefined ? undefined : cloneCredential(credential)
   }
 
-  async list(): Promise<readonly CredentialInfo[]> {
-    return Object.entries((await this.readDocument()).credentials).map(([providerId, credential]) => ({
+  async list(options?: AuthOperationOptions): Promise<readonly CredentialInfo[]> {
+    options?.signal?.throwIfAborted()
+    const document = await this.readDocument()
+    options?.signal?.throwIfAborted()
+    return Object.entries(document.credentials).map(([providerId, credential]) => ({
       providerId,
       type: credential.type,
     }))
@@ -179,15 +184,21 @@ export class PiLoginCredentialStore implements CredentialStore {
   async modify(
     providerId: string,
     fn: (current: Credential | undefined) => Promise<Credential | undefined>,
+    options?: AuthOperationOptions,
   ): Promise<Credential | undefined> {
     if (!PI_LOGIN_PROVIDERS.some(provider => provider.id === providerId)) {
       throw new Error(`pi-login: credential store does not own provider "${providerId}"`)
     }
+    options?.signal?.throwIfAborted()
     await mkdir(dirname(this.filename), { recursive: true, mode: 0o700 })
+    options?.signal?.throwIfAborted()
     return withFileLock(this.filename, async () => {
+      options?.signal?.throwIfAborted()
       const document = await this.readDocument()
+      options?.signal?.throwIfAborted()
       const current = document.credentials[providerId]
       const candidate = await fn(current === undefined ? undefined : cloneCredential(current))
+      options?.signal?.throwIfAborted()
       if (candidate === undefined) return current === undefined ? undefined : cloneCredential(current)
       const next = parseCredential(candidate, this.filename, providerId)
       const credentials = { ...document.credentials, [providerId]: next }
@@ -199,11 +210,15 @@ export class PiLoginCredentialStore implements CredentialStore {
     })
   }
 
-  async delete(providerId: string): Promise<void> {
+  async delete(providerId: string, options?: AuthOperationOptions): Promise<void> {
     if (!PI_LOGIN_PROVIDERS.some(provider => provider.id === providerId)) return
+    options?.signal?.throwIfAborted()
     await mkdir(dirname(this.filename), { recursive: true, mode: 0o700 })
+    options?.signal?.throwIfAborted()
     await withFileLock(this.filename, async () => {
+      options?.signal?.throwIfAborted()
       const document = await this.readDocument()
+      options?.signal?.throwIfAborted()
       if (document.credentials[providerId] === undefined) return
       const { [providerId]: _removed, ...credentials } = document.credentials
       if (Object.keys(credentials).length === 0) {

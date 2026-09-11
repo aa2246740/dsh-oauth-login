@@ -3,6 +3,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { AuthEvent, AuthPrompt } from '@earendil-works/pi-ai'
 import type { Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import { loginPiProviderSession, piLoginStatus } from './auth.ts'
 import { PI_LOGIN_PROVIDERS, requirePiLoginProvider } from './catalog.ts'
@@ -98,14 +99,25 @@ function answerSelectPrompt(prompt: AuthPrompt): string | undefined {
 }
 
 interface PendingInput {
+  readonly operationId: number
   resolve(value: string): void
   reject(error: unknown): void
 }
 
+interface LoginOperation {
+  readonly id: number
+  readonly cancellation: AbortController
+  readonly done: Promise<void>
+  cancelled?: Error
+  failure?: Error
+  result?: PiLoginAccountState
+  finish(): void
+}
+
 class ProviderAuth {
   state: PiLoginAccountState = { status: 'signed-out' }
-  private operation: Promise<void> | undefined
-  private cancellation: AbortController | undefined
+  private operation: LoginOperation | undefined
+  private nextOperationId = 0
   private challenge: LoginChallenge | undefined
   private challengeWaiters: Array<{ resolve(value: LoginChallenge): void; reject(error: unknown): void }> = []
   private pendingInput: PendingInput | undefined
@@ -130,22 +142,25 @@ class ProviderAuth {
   }
 
   async signOut(): Promise<void> {
+    const revision = this.nextOperationId
     const error = new Error('Pi login cancelled')
-    this.rejectInput(error)
-    this.cancellation?.abort(error)
-    await this.operation?.catch(() => undefined)
+    this.stop(this.operation, error)
     await this.session.logout(this.spec.id)
-    this.state = { status: 'signed-out' }
-    this.challenge = undefined
+    if (this.operation === undefined && this.nextOperationId === revision) {
+      this.state = { status: 'signed-out' }
+      this.challenge = undefined
+    }
   }
 
   async cancel(): Promise<void> {
+    const revision = this.nextOperationId
     const error = new Error('Pi login cancelled')
-    this.rejectInput(error)
-    this.cancellation?.abort(error)
-    await this.operation?.catch(() => undefined)
-    this.state = await this.readStored()
-    this.challenge = undefined
+    this.stop(this.operation, error)
+    const stored = await this.readStored()
+    if (this.operation === undefined && this.nextOperationId === revision) {
+      this.state = stored
+      this.challenge = undefined
+    }
   }
 
   async submitInput(value: string): Promise<PiLoginAccountState> {
@@ -156,67 +171,80 @@ class ProviderAuth {
     const normalized = value.trim()
     if (normalized.length === 0) throw new Error('credential must not be empty')
     if (normalized.length > 4096) throw new Error('credential is too long')
+    const operation = this.operation
+    if (operation === undefined || operation.id !== pending.operationId) {
+      throw new Error(`${this.spec.displayName} login operation is no longer active`)
+    }
     pending.resolve(normalized)
-    await this.operation?.catch(() => undefined)
-    if (this.state.status === 'error') throw new Error(this.state.message)
-    return this.state
+    await operation.done
+    if (operation.cancelled !== undefined) throw operation.cancelled
+    if (operation.failure !== undefined) throw operation.failure
+    return operation.result ?? this.state
   }
 
   /** Wait until an in-flight sign-in settles (success or error). No-op if idle. */
   async waitUntilSettled(): Promise<void> {
-    await this.operation?.catch(() => undefined)
+    await this.operation?.done
   }
 
   async dispose(): Promise<void> {
     const error = new Error('Pi login plugin disposed')
-    this.rejectInput(error)
-    this.cancellation?.abort(error)
-    await this.operation?.catch(() => undefined)
+    this.stop(this.operation, error)
   }
 
   private start(): void {
     const cancellation = new AbortController()
-    this.cancellation = cancellation
+    const id = ++this.nextOperationId
+    let finish!: () => void
+    const done = new Promise<void>(resolve => { finish = resolve })
+    const operation: LoginOperation = { id, cancellation, done, finish }
+    this.operation = operation
     this.challenge = undefined
     this.pendingInput = undefined
     this.state = { status: 'signing-in' }
-    this.operation = loginPiProviderSession(this.spec.id, {
+    void loginPiProviderSession(this.spec.id, {
       signal: cancellation.signal,
-      prompt: prompt => this.onPrompt(prompt),
-      notify: event => { this.onEvent(event) },
-    }, this.session).then(
-      async () => {
-        this.state = await this.readStored()
-      },
-      (error: unknown) => {
-        this.rejectChallenge(error)
-        this.rejectInput(error)
-        this.state = { status: 'error', message: safeMessage(error) }
-      },
-    ).finally(() => {
-      this.operation = undefined
-      this.cancellation = undefined
+      prompt: prompt => this.onPrompt(id, prompt),
+      notify: event => { this.onEvent(id, event) },
+    }, this.session).then(async () => {
+      if (!this.isCurrent(id)) return
+      const stored = await this.readStored()
+      if (!this.isCurrent(id)) return
+      operation.result = stored
+      this.state = stored
+    }).catch((error: unknown) => {
+      if (!this.isCurrent(id)) return
+      this.rejectChallenge(error)
+      this.rejectInput(error)
+      operation.failure = new Error(safeMessage(error))
+      this.state = { status: 'error', message: operation.failure.message }
+    }).finally(() => {
+      if (this.isCurrent(id)) this.operation = undefined
+      operation.finish()
     })
   }
 
-  private onPrompt(prompt: AuthPrompt): Promise<string> {
+  private onPrompt(operationId: number, prompt: AuthPrompt): Promise<string> {
+    if (!this.isCurrent(operationId)) return Promise.reject(new Error('Pi login cancelled'))
     const selected = answerSelectPrompt(prompt)
     if (selected !== undefined) return Promise.resolve(selected)
     // Preserve the existing optional-text behavior in OAuth providers. Secret
     // and manual-code prompts require an explicit local user action.
     if (prompt.type === 'text' && this.spec.authType === 'oauth') return Promise.resolve('')
     if (prompt.type === 'secret' || prompt.type === 'manual_code' || prompt.type === 'text') {
-      return this.requestInput(prompt)
+      return this.requestInput(operationId, prompt)
     }
     return waitForPromptAbort(prompt)
   }
 
-  private requestInput(prompt: InputAuthPrompt): Promise<string> {
+  private requestInput(operationId: number, prompt: InputAuthPrompt): Promise<string> {
     if (this.pendingInput !== undefined) {
       return Promise.reject(new Error(`${this.spec.displayName} already has a pending credential prompt`))
     }
     const input = loginInputChallenge(prompt)
-    const signals = [this.cancellation?.signal, prompt.signal]
+    const operation = this.operation
+    if (operation === undefined || operation.id !== operationId) return Promise.reject(new Error('Pi login cancelled'))
+    const signals = [operation.cancellation.signal, prompt.signal]
       .filter((signal): signal is AbortSignal => signal !== undefined)
     const wait = new Promise<string>((resolve, reject) => {
       let settled = false
@@ -241,7 +269,7 @@ class ProviderAuth {
         this.pendingInput = undefined
         reject(error)
       }
-      this.pendingInput = { resolve: settleResolve, reject: settleReject }
+      this.pendingInput = { operationId, resolve: settleResolve, reject: settleReject }
       for (const signal of signals) signal.addEventListener('abort', onAbort, { once: true })
       if (signals.some(signal => signal.aborted)) onAbort()
     })
@@ -254,7 +282,8 @@ class ProviderAuth {
     return wait
   }
 
-  private onEvent(event: AuthEvent): void {
+  private onEvent(operationId: number, event: AuthEvent): void {
+    if (!this.isCurrent(operationId)) return
     if (event.type === 'device_code') {
       this.acceptChallenge({
         provider: this.spec.id,
@@ -272,8 +301,7 @@ class ProviderAuth {
   private acceptChallenge(challenge: LoginChallenge): void {
     if (challenge.url !== undefined && !isSafeAuthUrl(challenge.url, this.spec)) {
       const error = new Error(`${this.spec.id} returned an authorization URL outside its official hosts`)
-      this.cancellation?.abort(error)
-      this.rejectChallenge(error)
+      this.stop(this.operation, error)
       return
     }
     const merged = mergeLoginChallenge(this.challenge, challenge)
@@ -306,6 +334,20 @@ class ProviderAuth {
 
   private rejectInput(error: unknown): void {
     this.pendingInput?.reject(error)
+  }
+
+  private isCurrent(operationId: number): boolean {
+    return this.operation?.id === operationId
+  }
+
+  private stop(operation: LoginOperation | undefined, error: Error): void {
+    if (operation === undefined || this.operation?.id !== operation.id) return
+    this.operation = undefined
+    operation.cancelled = error
+    this.rejectChallenge(error)
+    this.rejectInput(error)
+    operation.cancellation.abort(error)
+    operation.finish()
   }
 }
 
@@ -399,6 +441,19 @@ function trustedProxyRequest(req: IncomingMessage): boolean {
   } catch { return false }
 }
 
+function rejectWebRequest(ctx: Context, req: IncomingMessage, res: ServerResponse, proxy = false): boolean {
+  const rejection = ctx.connection.requestRejection(req)
+  if (rejection !== undefined) {
+    json(res, rejection, { error: rejection === 401 ? 'unauthorized' : 'forbidden' })
+    return true
+  }
+  if (proxy ? !trustedProxyRequest(req) : !trustedRequest(req)) {
+    json(res, 403, { error: 'forbidden' })
+    return true
+  }
+  return false
+}
+
 function json(res: ServerResponse, status: number, value: unknown): void {
   res.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
@@ -464,7 +519,7 @@ export function registerPiLoginAuthRoutes(
         kind: 'exact',
         path: PROXY_SETTINGS_PATH,
         handler: async (req, res) => {
-          if (!trustedProxyRequest(req)) return json(res, 403, { error: 'forbidden' })
+          if (rejectWebRequest(ctx, req, res, true)) return
           if (req.method === 'GET') {
             try { return json(res, 200, await session.proxy.settings.read()) } catch {
               return json(res, 503, { error: 'Network settings could not be read' })
@@ -488,8 +543,8 @@ export function registerPiLoginAuthRoutes(
         kind: 'exact',
         path: OPENROUTER_CATALOG_PATH,
         handler: async (req, res) => {
+          if (rejectWebRequest(ctx, req, res)) return
           if (req.method !== 'GET') return json(res, 405, { error: 'method not allowed' })
-          if (!trustedRequest(req)) return json(res, 403, { error: 'forbidden' })
           try {
             await session.openRouter.syncAuthentication()
             json(res, 200, session.openRouter.snapshot())
@@ -502,8 +557,8 @@ export function registerPiLoginAuthRoutes(
         kind: 'exact',
         path: OPENROUTER_REFRESH_PATH,
         handler: async (req, res) => {
+          if (rejectWebRequest(ctx, req, res)) return
           if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
-          if (!trustedRequest(req)) return json(res, 403, { error: 'forbidden' })
           try {
             await session.openRouter.syncAuthentication()
             if (!session.openRouter.snapshot().connected) {
@@ -520,8 +575,8 @@ export function registerPiLoginAuthRoutes(
         kind: 'exact',
         path: PI_LOGIN_AUTH_STATUS_PATH,
         handler: async (req, res) => {
+          if (rejectWebRequest(ctx, req, res)) return
           if (req.method !== 'GET') return json(res, 405, { error: 'method not allowed' })
-          if (!trustedRequest(req)) return json(res, 403, { error: 'forbidden' })
           json(res, 200, await auth.status())
         },
       }),
@@ -529,8 +584,8 @@ export function registerPiLoginAuthRoutes(
         kind: 'exact',
         path: PI_LOGIN_AUTH_LOGIN_PATH,
         handler: async (req, res) => {
+          if (rejectWebRequest(ctx, req, res)) return
           if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
-          if (!trustedRequest(req)) return json(res, 403, { error: 'forbidden' })
           try {
             const challenge = await auth.signIn(providerIdFrom(await readJson(req)))
             if (challenge.kind === 'browser') {
@@ -549,8 +604,8 @@ export function registerPiLoginAuthRoutes(
         kind: 'exact',
         path: PI_LOGIN_AUTH_CANCEL_PATH,
         handler: async (req, res) => {
+          if (rejectWebRequest(ctx, req, res)) return
           if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
-          if (!trustedRequest(req)) return json(res, 403, { error: 'forbidden' })
           try {
             await auth.cancel(providerIdFrom(await readJson(req)))
             json(res, 200, { ok: true })
@@ -563,8 +618,8 @@ export function registerPiLoginAuthRoutes(
         kind: 'exact',
         path: PI_LOGIN_AUTH_COMPLETE_PATH,
         handler: async (req, res) => {
+          if (rejectWebRequest(ctx, req, res)) return
           if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
-          if (!trustedRequest(req)) return json(res, 403, { error: 'forbidden' })
           try {
             const submission = providerInputFrom(await readJson(req))
             const account = await auth.submitInput(submission.providerId, submission.value)
@@ -579,8 +634,8 @@ export function registerPiLoginAuthRoutes(
         kind: 'exact',
         path: PI_LOGIN_AUTH_LOGOUT_PATH,
         handler: async (req, res) => {
+          if (rejectWebRequest(ctx, req, res)) return
           if (req.method !== 'POST') return json(res, 405, { error: 'method not allowed' })
-          if (!trustedRequest(req)) return json(res, 403, { error: 'forbidden' })
           try {
             await auth.signOut(providerIdFrom(await readJson(req)))
             await notifyAuthChanged()

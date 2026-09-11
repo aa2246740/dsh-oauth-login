@@ -2,7 +2,7 @@ import { IncomingMessage, ServerResponse } from 'node:http'
 import { Socket } from 'node:net'
 import type { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { registerPiLoginAuthRoutes } from '../src/auth-routes.ts'
+import { PI_LOGIN_AUTH_LOGIN_PATH, registerPiLoginAuthRoutes } from '../src/auth-routes.ts'
 import { OPENROUTER_CATALOG_PATH, OPENROUTER_REFRESH_PATH } from '../src/openrouter-types.ts'
 import type { PiLoginSession } from '../src/session.ts'
 import { mkdtemp } from 'node:fs/promises'
@@ -15,7 +15,7 @@ type Handler = (req: IncomingMessage, res: ServerResponse) => void | Promise<voi
 const cleanups: Array<() => Promise<void>> = []
 afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup() })
 
-function fixture(connected = true, proxy?: OAuthProxyTransport) {
+function fixture(connected = true, proxy?: OAuthProxyTransport, rejection?: 401 | 403) {
   const routes = new Map<string, Handler>()
   const syncAuthentication = vi.fn(async () => {})
   const refresh = vi.fn(async () => {})
@@ -25,6 +25,7 @@ function fixture(connected = true, proxy?: OAuthProxyTransport) {
     openRouter: { syncAuthentication, refresh, snapshot: () => snapshot },
   } as unknown as PiLoginSession
   const ctx = {
+    connection: { requestRejection: vi.fn(() => rejection) },
     webServer: { register: (route: { path: string; handler: Handler }) => {
       routes.set(route.path, route.handler)
       return () => { routes.delete(route.path) }
@@ -75,6 +76,15 @@ describe('OpenRouter local catalog routes', () => {
     expect((await f.request(OPENROUTER_CATALOG_PATH, 'GET', {}, '192.168.1.2')).status).toBe(403)
     expect(f.syncAuthentication).not.toHaveBeenCalled()
     expect(f.refresh).not.toHaveBeenCalled()
+  })
+  it('uses Connection authentication before catalog or provider work', async () => {
+    for (const rejection of [401, 403] as const) {
+      const f = fixture(true, undefined, rejection)
+      expect((await f.request(OPENROUTER_REFRESH_PATH, 'POST')).status).toBe(rejection)
+      expect((await f.request(PI_LOGIN_AUTH_LOGIN_PATH, 'POST')).status).toBe(rejection)
+      expect(f.syncAuthentication).not.toHaveBeenCalled()
+      expect(f.refresh).not.toHaveBeenCalled()
+    }
   })
   it('does not refresh after logout and returns a recoverable unavailable response', async () => {
     const f = fixture(false)

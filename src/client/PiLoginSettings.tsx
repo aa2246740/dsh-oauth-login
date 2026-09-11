@@ -1,6 +1,6 @@
 /** Plugin-owned Pi login page inside the dsh Settings shell. */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { applyDraftChange } from './draft-input.ts'
 import type { Drafts } from './draft-input.ts'
 import type { PiLoginKey } from './locales.ts'
@@ -144,11 +144,12 @@ function ensureThemeStyles(): void {
   document.head.appendChild(style)
 }
 
-async function jsonRequest<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
+async function jsonRequest<T>(path: string, method = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(path, {
     method,
     headers: { accept: 'application/json', ...body === undefined ? {} : { 'content-type': 'application/json' } },
     credentials: 'same-origin',
+    signal,
     ...body === undefined ? {} : { body: JSON.stringify(body) },
   })
   const value: unknown = await response.json().catch(() => undefined)
@@ -168,15 +169,45 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
   const [busy, setBusy] = useState<string | undefined>(undefined)
   const [drafts, setDrafts] = useState<Drafts>({})
   const [challengeUrls, setChallengeUrls] = useState<Record<string, string>>({})
+  const [cancellable, setCancellable] = useState<Record<string, boolean>>({})
+  const [cancelling, setCancelling] = useState<string | undefined>(undefined)
+  const operationSequence = useRef(0)
+  const statusSequence = useRef(0)
+  const operations = useRef(new Map<string, { readonly id: number; readonly controller: AbortController; readonly popup?: Window }>())
+
+  const startOperation = (provider: string, canCancel: boolean, popup?: Window): { readonly id: number; readonly controller: AbortController } => {
+    const previous = operations.current.get(provider)
+    previous?.controller.abort()
+    previous?.popup?.close()
+    const operation = { id: ++operationSequence.current, controller: new AbortController(), ...popup === undefined ? {} : { popup } }
+    operations.current.set(provider, operation)
+    setBusy(provider)
+    setCancellable(current => ({ ...current, [provider]: canCancel }))
+    return operation
+  }
+  const isCurrent = (provider: string, operation: { readonly id: number }): boolean => operations.current.get(provider)?.id === operation.id
+  const finishOperation = (provider: string, operation: { readonly id: number }): void => {
+    if (!isCurrent(provider, operation)) return
+    operations.current.delete(provider)
+    setBusy(undefined)
+    setCancellable(current => {
+      const { [provider]: _removed, ...next } = current
+      return next
+    })
+  }
 
   useEffect(() => { ensureThemeStyles() }, [])
 
   const refresh = useCallback(async () => {
+    const requestId = ++statusSequence.current
     try {
-      setProviders(await jsonRequest<ProviderStatus[]>(STATUS_PATH))
+      const next = await jsonRequest<ProviderStatus[]>(STATUS_PATH)
+      if (requestId !== statusSequence.current) return
+      setProviders(next)
       void catalog?.load()
       setError(undefined)
     } catch (caught: unknown) {
+      if (requestId !== statusSequence.current) return
       setError(caught instanceof Error ? caught.message : t('requestFailed'))
     }
   }, [t, catalog])
@@ -196,9 +227,10 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
       const { [id]: _removed, ...next } = current
       return next
     })
-    setBusy(id)
+    const operation = startOperation(id, true, popup ?? undefined)
     try {
-      const challenge = await jsonRequest<LoginChallenge>(LOGIN_PATH, 'POST', { provider: id })
+      const challenge = await jsonRequest<LoginChallenge>(LOGIN_PATH, 'POST', { provider: id }, operation.controller.signal)
+      if (!isCurrent(id, operation)) return
       if (challenge.url !== undefined) {
         setChallengeUrls(current => ({ ...current, [id]: challenge.url! }))
       }
@@ -208,9 +240,9 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
       await refresh()
     } catch (caught: unknown) {
       popup?.close()
-      setError(caught instanceof Error ? caught.message : t('requestFailed'))
+      if (isCurrent(id, operation) && !operation.controller.signal.aborted) setError(caught instanceof Error ? caught.message : t('requestFailed'))
     } finally {
-      setBusy(undefined)
+      finishOperation(id, operation)
     }
   }
 
@@ -221,9 +253,10 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
       setError(t(challenge === undefined ? 'authInputRequired' : loginInputCopy(provider.authType, challenge.type).required))
       return
     }
-    setBusy(provider.id)
+    const operation = startOperation(provider.id, true)
     try {
-      await jsonRequest<{ ok: true }>(COMPLETE_PATH, 'POST', { provider: provider.id, value })
+      await jsonRequest<{ ok: true }>(COMPLETE_PATH, 'POST', { provider: provider.id, value }, operation.controller.signal)
+      if (!isCurrent(provider.id, operation)) return
       setChallengeUrls(current => {
         const { [provider.id]: _removed, ...next } = current
         return next
@@ -234,16 +267,18 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
       })
       await refresh()
     } catch (caught: unknown) {
-      setError(caught instanceof Error ? caught.message : t('requestFailed'))
+      if (isCurrent(provider.id, operation) && !operation.controller.signal.aborted) setError(caught instanceof Error ? caught.message : t('requestFailed'))
     } finally {
-      setBusy(undefined)
+      finishOperation(provider.id, operation)
     }
   }
 
   const cancelSignIn = async (id: string): Promise<void> => {
-    setBusy(id)
+    const operation = startOperation(id, false)
+    setCancelling(id)
     try {
-      await jsonRequest<{ ok: true }>(CANCEL_PATH, 'POST', { provider: id })
+      await jsonRequest<{ ok: true }>(CANCEL_PATH, 'POST', { provider: id }, operation.controller.signal)
+      if (!isCurrent(id, operation)) return
       setChallengeUrls(current => {
         const { [id]: _removed, ...next } = current
         return next
@@ -254,9 +289,10 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
       })
       await refresh()
     } catch (caught: unknown) {
-      setError(caught instanceof Error ? caught.message : t('requestFailed'))
+      if (isCurrent(id, operation) && !operation.controller.signal.aborted) setError(caught instanceof Error ? caught.message : t('requestFailed'))
     } finally {
-      setBusy(undefined)
+      if (isCurrent(id, operation)) setCancelling(undefined)
+      finishOperation(id, operation)
     }
   }
 
@@ -328,7 +364,7 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
                               {busy === provider.id ? t('working') : t('logout')}
                             </button>
                           )
-                        : account.status === 'signing-in'
+                        : account.status === 'signing-in' || cancellable[provider.id] === true
                           ? (
                               <div className="dsh-pi-login-row-actions">
                                 {challengeUrl !== undefined
@@ -346,10 +382,10 @@ export function PiLoginSettings({ t, ts, catalog }: PiLoginSettingsProps) {
                                 <button
                                   type="button"
                                   className="dsh-pi-login-btn dsh-pi-login-btn-secondary"
-                                  disabled={busy !== undefined}
+                                  disabled={cancelling === provider.id || (busy !== undefined && busy !== provider.id)}
                                   onClick={() => { void cancelSignIn(provider.id) }}
                                 >
-                                  {busy === provider.id ? t('working') : t('cancelLogin')}
+                                  {cancelling === provider.id ? t('working') : t('cancelLogin')}
                                 </button>
                               </div>
                             )
