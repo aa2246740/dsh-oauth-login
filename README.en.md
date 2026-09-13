@@ -2,6 +2,12 @@
 
 [中文](README.md) | English
 
+```sh
+dsh plugin --profile web add github:aa2246740/dsh-oauth-login
+```
+
+You need official `dsh` on PATH (or `npx @deepseek-ai/dsh`) and **pnpm**. Then restart that Host and reload the page. `dsh plugin add` writes the profile. It does not hot-load a running Host.
+
 OAuth login for ChatGPT, Claude, Grok, Copilot, OpenRouter, and Kimi on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), plus Zhipu GLM Coding Plan via its official plan API key. Credentials go only to `$DSH_HOME/.dsh-oauth-auth.json`.
 
 Official `codex login`, Claude Code, `grok` CLI, and Pi Agent `~/.pi/agent/auth.json` are not read or written.
@@ -20,7 +26,17 @@ The UI is **Settings → 订阅登录**.
 
 ## Install
 
-Node 22.19+ and a working DeepSeek Harness.
+Node 22.19+ and official DeepSeek Harness **0.1.5-rc.2**.
+
+That `github:` command works because this package declares `dsh.bundle.patch` and commits built `lib/`. Official `dsh plugin add` runs pnpm in `$DSH_HOME/profiles/web` and appends this package to `dsh.profile.bundles`. You do not need Creator Mode or a second toolchain.
+
+If `dsh` is not on PATH:
+
+```sh
+npx @deepseek-ai/dsh plugin --profile web add github:aa2246740/dsh-oauth-login
+```
+
+Use `file:` only when you are editing a local clone (do not drop the prefix):
 
 ```sh
 git clone https://github.com/aa2246740/dsh-oauth-login.git
@@ -29,7 +45,7 @@ dsh plugin --profile web add file:./dsh-oauth-login
 
 Keep the `file:` prefix. A bare `./dsh-oauth-login` becomes a symlink and peer dependencies will not resolve.
 
-Restart `dsh web`. Open **Settings → 订阅登录**. Pick a `pi-…` route in chat.
+Open **Settings → 订阅登录**. Pick a `pi-…` route in chat.
 
 ```sh
 dsh plugin --profile web exec dsh-oauth-login login openai-codex

@@ -2,18 +2,34 @@
 
 [中文](INSTALL.zh.md). Product pages: [README.md](README.md) (中文), [README.en.md](README.en.md).
 
-Clone the public repository, then add the folder as a `file:` package.
+Stock DeepSeek Harness **0.1.5-rc.2** users install with official `dsh` and **pnpm**:
+
+```sh
+dsh plugin --profile web add github:aa2246740/dsh-oauth-login
+```
+
+If `dsh` is not on PATH:
+
+```sh
+npx @deepseek-ai/dsh plugin --profile web add github:aa2246740/dsh-oauth-login
+```
+
+That `github:` spec works because the package declares `dsh.bundle.patch` and
+commits built `lib/`. Official add runs pnpm in `$DSH_HOME/profiles/web` and
+appends the package to `dsh.profile.bundles`. Then restart that Host and reload
+the page. You do not need Creator Mode or a second toolchain.
+
+Use `file:` only when editing a local clone. Keep the prefix. A bare
+`./dsh-oauth-login` becomes a symlink, while this plugin intentionally resolves
+its DSH runtime peer dependencies from the profile; the `file:` install copies
+the package into that resolution tree.
 
 ```sh
 git clone https://github.com/aa2246740/dsh-oauth-login.git
 dsh plugin --profile web add file:./dsh-oauth-login
 ```
 
-Keep the `file:` prefix. A bare `./dsh-oauth-login` becomes a symlink, while this
-plugin intentionally resolves its DSH runtime peer dependencies from the
-profile; the `file:` install copies the package into that resolution tree.
-
-Restart `dsh web`. Settings → **Subscription Login**. Existing DSH installs keep the old filename as a one-time DSH migration source and never touch Pi Agent auth.
+Settings → **Subscription Login**. Existing DSH installs keep the old filename as a one-time DSH migration source and never touch Pi Agent auth.
 
 ```sh
 dsh plugin --profile web exec dsh-oauth-login login openai-codex

@@ -2,16 +2,28 @@
 
 [English](INSTALL.md)。说明和截图在 [README.md](README.md)，英文在 [README.en.md](README.en.md)。
 
-克隆公开仓库，再按 `file:` 包安装。
+官方 DeepSeek Harness **0.1.5-rc.2** 用户用官方 `dsh` 和 **pnpm** 安装：
+
+```sh
+dsh plugin --profile web add github:aa2246740/dsh-oauth-login
+```
+
+没有 `dsh` 时：
+
+```sh
+npx @deepseek-ai/dsh plugin --profile web add github:aa2246740/dsh-oauth-login
+```
+
+这条 `github:` 命令能装上，是因为包装了 `dsh.bundle.patch`，并且仓库提交了编好的 `lib/`。官方 add 在 `$DSH_HOME/profiles/web` 里跑 pnpm，再把这个包装进 `dsh.profile.bundles`。装完重启这个 Host，刷新页面。不需要 Creator Mode，也不需要另装一套工具。
+
+本机改源码时再用 `file:`，并且必须保留前缀。直接写 `./dsh-oauth-login` 会变成符号链接；本插件有意从 profile 复用 DSH 运行时的 peer dependency，因此必须使用 `file:` 副本，才能正确解析依赖。
 
 ```sh
 git clone https://github.com/aa2246740/dsh-oauth-login.git
 dsh plugin --profile web add file:./dsh-oauth-login
 ```
 
-请保留 `file:` 前缀。直接写 `./dsh-oauth-login` 会变成符号链接；本插件有意从 profile 复用 DSH 运行时的 peer dependency，因此必须使用 `file:` 副本，才能正确解析依赖。
-
-重启 `dsh web`。设置 → **订阅登录**。旧版 DSH 文件只作为一次性迁移来源，不会读取或修改 Pi Agent 的登录文件。
+设置 → **订阅登录**。旧版 DSH 文件只作为一次性迁移来源，不会读取或修改 Pi Agent 的登录文件。
 
 ```sh
 dsh plugin --profile web exec dsh-oauth-login login openai-codex

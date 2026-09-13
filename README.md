@@ -2,6 +2,12 @@
 
 中文 | [English](README.en.md)
 
+```sh
+dsh plugin --profile web add github:aa2246740/dsh-oauth-login
+```
+
+PATH 上需要官方 `dsh`（没有的话用 `npx @deepseek-ai/dsh`）和 **pnpm**。装完重启这个 Host，刷新页面。`dsh plugin add` 只写 profile，不会热挂正在跑的 Host。
+
 把 ChatGPT、Claude、Grok、Copilot、OpenRouter、Kimi 的 OAuth 登录和智谱 GLM Coding Plan 接到 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)。凭据只写 `$DSH_HOME/.dsh-oauth-auth.json`。
 
 厂商公开 OAuth 就按其流程登录。智谱用官方 Coding Plan API Key。官方 `codex login`、Claude Code、`grok` CLI、Pi Agent 的 `~/.pi/agent/auth.json`，这里不读也不写。
@@ -20,7 +26,17 @@
 
 ## 安装
 
-需要 Node 22.19+，以及能跑起来的 DeepSeek Harness。
+需要 Node 22.19+，以及能跑起来的官方 DeepSeek Harness **0.1.5-rc.2**。
+
+这条 `github:` 命令能装上，是因为包装了 `dsh.bundle.patch`，并且仓库提交了编好的 `lib/`。官方 `dsh plugin add` 在 `$DSH_HOME/profiles/web` 里跑 pnpm，再把这个包装进 `dsh.profile.bundles`。不需要 Creator Mode，也不需要另装一套工具。
+
+没有 `dsh` 时：
+
+```sh
+npx @deepseek-ai/dsh plugin --profile web add github:aa2246740/dsh-oauth-login
+```
+
+本机改源码时再用 `file:`（不要写成裸的 `./`）：
 
 ```sh
 git clone https://github.com/aa2246740/dsh-oauth-login.git
@@ -29,7 +45,7 @@ dsh plugin --profile web add file:./dsh-oauth-login
 
 `file:` 前缀必须留着。写成 `./dsh-oauth-login` 会被装成符号链接，peer 依赖解析不到。
 
-重启 `dsh web`。打开 **设置 → 订阅登录**。对话里选 `pi-…` 路由。
+打开 **设置 → 订阅登录**。对话里选 `pi-…` 路由。
 
 ```sh
 dsh plugin --profile web exec dsh-oauth-login login openai-codex
