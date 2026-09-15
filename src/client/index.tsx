@@ -24,7 +24,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 export const name = 'dsh-oauth-login-client'
-export const inject = ['slots', 'locale', 'sessions', 'modelDirectories']
+// directoryFor() resolves remote.session through the calling plugin's context.
+export const inject = ['slots', 'locale', 'sessions', 'modelDirectories', 'remote', 'remote.session']
 
 export function apply(ctx: ClientContext): void {
   const catalog = new OpenRouterCatalogClient()
