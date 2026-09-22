@@ -2,7 +2,7 @@
 
 [中文](INSTALL.zh.md). Product pages: [README.md](README.md) (中文), [README.en.md](README.en.md).
 
-Stock DeepSeek Harness **0.1.5-rc.2** users install with official `dsh` and **pnpm**:
+Stock DeepSeek Harness **0.1.5-rc.3** users install with official `dsh` and **pnpm**:
 
 ```sh
 dsh plugin --profile web add github:aa2246740/dsh-oauth-login
