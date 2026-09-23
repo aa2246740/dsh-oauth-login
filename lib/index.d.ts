@@ -1,4 +1,4 @@
-import { LlmFailure, Message, RetryPolicyConfig, StreamChunk } from "@deepseek-ai/dsh-llm";
+import { LlmFailure, RequestMessage, RetryPolicyConfig, StreamChunk } from "@deepseek-ai/dsh-llm";
 import { Api, AuthInteraction, AuthOperationOptions, Context, Credential, CredentialInfo, CredentialStore, Model, MutableModels, Provider, StreamOptions } from "@earendil-works/pi-ai";
 import { PiAiAdapter } from "@deepseek-ai/dsh-llm-pi-ai";
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -395,7 +395,7 @@ declare function decodeHostedImage(base64: string): {
  * pi-ai replay cannot represent assistant ImageBlocks. Drop them before the
  * next request so replay metadata still lines up with remaining content.
  */
-declare function stripAssistantImages(messages: readonly Message[]): Message[];
+declare function stripAssistantImages(messages: readonly RequestMessage[]): RequestMessage[];
 declare function injectHostedImages(source: AsyncIterable<StreamChunk>, capture: HostedCapture, save: (input: SaveImageAttachment) => Promise<ImageAttachmentRef>): AsyncGenerator<StreamChunk>;
 //#endregion
 //#region src/oauth-refresh.d.ts

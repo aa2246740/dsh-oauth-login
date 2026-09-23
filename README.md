@@ -26,7 +26,7 @@ PATH 上需要官方 `dsh`（没有的话用 `npx @deepseek-ai/dsh`）和 **pnpm
 
 ## 安装
 
-需要 Node 22.19+，以及能跑起来的官方 DeepSeek Harness **0.1.5-rc.3**（`@deepseek-ai/dsh@0.1.5-rc.3`，tag `dsh-v0.1.5-rc.3`）。
+需要 Node 22.19+，以及能跑起来的官方 DeepSeek Harness **0.1.7-rc.1**（`@deepseek-ai/dsh@0.1.7-rc.1`，tag `dsh-v0.1.7-rc.1`）。
 
 这条 `github:` 命令能装上，是因为包装了 `dsh.bundle.patch`，并且仓库提交了编好的 `lib/`。官方 `dsh plugin add` 在 `$DSH_HOME/profiles/web` 里跑 pnpm，再把这个包装进 `dsh.profile.bundles`。不需要 Creator Mode，也不需要另装一套工具。
 

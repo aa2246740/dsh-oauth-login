@@ -322,18 +322,22 @@ export function SearchableModelSelect(
     close()
   }
 
-  const settleSelection = (accepted: boolean): void => {
-    if (accepted) {
+  const settleSelection = (result: Awaited<ReturnType<ModelSelectInjected['select']>>): void => {
+    if (result === undefined) return
+    if (result.ok) {
       if (rootRef.current !== null) close(true)
       return
     }
-    const message = directory.getSnapshot().error
-    if (message !== null) {
-      noticeSeq.current += 1
-      window.clearTimeout(noticeTimer.current)
-      setNotice({ seq: noticeSeq.current, text: t('error.action', { message }) })
-      noticeTimer.current = window.setTimeout(() => { setNotice(null) }, 4000)
-    }
+    const { error } = result
+    noticeSeq.current += 1
+    window.clearTimeout(noticeTimer.current)
+    setNotice({
+      seq: noticeSeq.current,
+      text: error.code === 'session/writer-held'
+        ? t('error.sessionInUse')
+        : t('error.action', { message: `${error.code}: ${error.message}` }),
+    })
+    noticeTimer.current = window.setTimeout(() => { setNotice(null) }, 4000)
   }
 
   const choose = (selection: ModelSelection): void => {
