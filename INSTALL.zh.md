@@ -2,7 +2,7 @@
 
 [English](INSTALL.md)。说明和截图在 [README.md](README.md)，英文在 [README.en.md](README.en.md)。
 
-官方 DeepSeek Harness **0.1.5-rc.2** 用户用官方 `dsh` 和 **pnpm** 安装：
+官方 DeepSeek Harness **0.1.5-rc.3** 用户用官方 `dsh` 和 **pnpm** 安装：
 
 ```sh
 dsh plugin --profile web add github:aa2246740/dsh-oauth-login

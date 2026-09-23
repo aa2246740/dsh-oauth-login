@@ -15,7 +15,7 @@ describe('Pi login catalog', () => {
       baseUrl: 'https://chatgpt.com/backend-api', input: ['text', 'image'],
       contextWindow: 272_000, maxTokens: 128_000,
     })
-    expect(getSupportedThinkingLevels(astra)).toEqual(['low', 'medium', 'high', 'xhigh', 'max'])
+    expect(getSupportedThinkingLevels(astra)).toEqual(['minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
     expect(defaultReasoningEffortFor(astra.id)).toBe('medium')
     for (const old of catalogProvider('openai-codex').getModels()) {
       expect(models.some(model => model.id === old.id)).toBe(true)
