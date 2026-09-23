@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
-import type { Message, StreamChunk } from '@deepseek-ai/dsh-llm'
+import { MessageId, type StreamChunk } from '@deepseek-ai/dsh-llm'
 import {
   collectHostedImagesFromEvent,
   decodeHostedImage,
@@ -71,15 +71,16 @@ describe('hosted image receive', () => {
       height: 1,
     } as ImageAttachmentRef
     const messages = stripAssistantImages([
-      { role: 'user', content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' } } as Message,
+      { id: MessageId('user-1'), role: 'user', content: [{ type: 'text', text: 'hi' }], source: { kind: 'user' } },
       {
+        id: MessageId('assistant-1'),
         role: 'assistant',
         content: [
           { type: 'text', text: 'done' },
           { type: 'image', attachment },
         ],
         source: { kind: 'model', provider: 'pi-xai', model: 'grok-4.6' },
-      } as Message,
+      },
     ])
     expect(messages[1]?.content).toEqual([{ type: 'text', text: 'done' }])
   })

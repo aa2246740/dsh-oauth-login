@@ -4,7 +4,7 @@
  */
 
 import type { ImageAttachmentRef, ImageMediaType, SaveImageAttachment } from '@deepseek-ai/dsh-attachment'
-import type { Message, StreamChunk } from '@deepseek-ai/dsh-llm'
+import type { RequestMessage, StreamChunk } from '@deepseek-ai/dsh-llm'
 import type { HostedCapture, HostedImage } from './hosted-capture.ts'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -107,7 +107,7 @@ function extensionFor(mediaType: ImageMediaType): string {
  * pi-ai replay cannot represent assistant ImageBlocks. Drop them before the
  * next request so replay metadata still lines up with remaining content.
  */
-export function stripAssistantImages(messages: readonly Message[]): Message[] {
+export function stripAssistantImages(messages: readonly RequestMessage[]): RequestMessage[] {
   return messages.map(message => {
     if (message.role !== 'assistant') return message
     const content = message.content.filter(block => block.type !== 'image')
