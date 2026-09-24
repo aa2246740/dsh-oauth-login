@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 import { defineConfig } from 'tsdown'
 
 const nodeExternal = [
@@ -11,19 +11,20 @@ const nodeExternal = [
   'react/jsx-runtime',
 ]
 
-function resolveHarness(): string {
+const vendored = fileURLToPath(new URL('./tools/client-build.js', import.meta.url))
+
+function resolveHarnessAdapter(): string {
   const configured = process.env.DSHX_HARNESS?.trim()
-  if (configured) return resolve(configured)
   const configPath = join(homedir(), '.config/dshx/harness')
   const recorded = existsSync(configPath) ? readFileSync(configPath, 'utf8').trim() : undefined
-  if (!recorded) {
+  const root = configured ? resolve(configured) : recorded ? resolve(recorded) : undefined
+  if (!root) {
     throw new Error('dshx client build requires a Harness root from DSHX_HARNESS or ~/.config/dshx/harness')
   }
-  return resolve(recorded)
+  return join(root, 'tools/dshx/src/client-build.js')
 }
 
-const harness = resolveHarness()
-const adapter = resolve(harness, 'tools/dshx/src/client-build.js')
+const adapter = existsSync(vendored) ? vendored : resolveHarnessAdapter()
 if (!existsSync(adapter)) throw new Error('DSHX externalClientBundle adapter is missing.')
 const { externalClientBundle } = await import(pathToFileURL(adapter).href)
 const client = externalClientBundle('dsh-oauth-login', [], { clientEntry: 'src/client/index.tsx' })[1]
