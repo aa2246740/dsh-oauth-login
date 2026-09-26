@@ -27,12 +27,14 @@ describe('stock dsh plugin add', () => {
     expect(existsSync(resolve(root, 'lib/client.js'))).toBe(true)
   })
 
-  it('accepts official Harness 0.1.7-rc.1 peers and refuses 0.1.7 alphas', () => {
+  it('accepts official Harness 0.1.7-rc.2 peers and refuses 0.1.7 alphas', () => {
     const connection = pkg.peerDependencies['@deepseek-ai/dsh-client-connection']
     const pi = pkg.peerDependencies['@earendil-works/pi-ai']
     const options = { includePrerelease: true }
+    expect(connection).toBe('>=0.1.7-rc.1 <0.1.8')
     expect(satisfies('0.1.7-rc.1', connection, options)).toBe(true)
-    expect(satisfies('0.1.7-rc.1', connection)).toBe(true)
+    expect(satisfies('0.1.7-rc.2', connection, options)).toBe(true)
+    expect(satisfies('0.1.7-rc.2', connection)).toBe(true)
     expect(satisfies('0.1.7-alpha.1', connection, options)).toBe(false)
     expect(satisfies('0.1.7-alpha.2', connection, options)).toBe(false)
     expect(satisfies('0.1.5-rc.3', connection, options)).toBe(false)
@@ -40,6 +42,11 @@ describe('stock dsh plugin add', () => {
     expect(satisfies('0.1.5-rc.3', '^0.1.2-rc.1')).toBe(false)
     expect(satisfies('0.85.1', pi)).toBe(true)
     expect(satisfies('0.85.1', '^0.82.1')).toBe(false)
+  })
+
+  it('matches the rc.2 client inline allowlist', () => {
+    const source = readFileSync(resolve(root, 'tools/client-build.js'), 'utf8')
+    expect(source).toContain('dsh-api-workspace-controller\\/default-workspace$')
   })
 
   it('leads the README with the official github: add', () => {

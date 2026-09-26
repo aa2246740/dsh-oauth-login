@@ -26,7 +26,7 @@ The UI is **Settings → 订阅登录**.
 
 ## Install
 
-Node 22.19+ and official DeepSeek Harness **0.1.7-rc.1** (`@deepseek-ai/dsh@0.1.7-rc.1`, tag `dsh-v0.1.7-rc.1`).
+Node 22.19+ and official DeepSeek Harness **0.1.7-rc.2** (`@deepseek-ai/dsh@0.1.7-rc.2`, tag `dsh-v0.1.7-rc.2`).
 
 That `github:` command works because this package declares `dsh.bundle.patch` and commits built `lib/`. Official `dsh plugin add` runs pnpm in `$DSH_HOME/profiles/web` and appends this package to `dsh.profile.bundles`. You do not need Creator Mode or a second toolchain.
 
