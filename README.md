@@ -2,11 +2,25 @@
 
 中文 | [English](README.en.md)
 
-```sh
-dsh plugin --profile web add github:aa2246740/dsh-oauth-login
+## 安装
+
+### DSH Studio 桌面 App（推荐）
+
+打开 **设置 → 插件 → 添加插件**，在“包名或地址”中输入：
+
+```text
+github:aa2246740/dsh-oauth-login#v0.2.6
 ```
 
-PATH 上需要官方 `dsh`（没有的话用 `npx @deepseek-ai/dsh`）和 **pnpm**。装完重启这个 Host，刷新页面。`dsh plugin add` 只写 profile，不会热挂正在跑的 Host。
+桌面端插件管理器负责 Desktop profile 和内置包管理器。本发布已包含编译好的 `lib/`；普通使用不需要 clone、构建或安装 DSHX。若应用提示刷新或重新打开，请按提示完成。
+
+### Web CLI
+
+```sh
+dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.6
+```
+
+这条官方 CLI 命令只写入 `web` profile，不能修改 Desktop App 的 profile。对于已经运行的 Web Host，请重新打开该 Host 一次，再刷新网页。
 
 把 ChatGPT、Claude、Grok、Copilot、OpenRouter、Kimi 的 OAuth 登录和智谱 GLM Coding Plan 接到 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)。凭据只写 `$DSH_HOME/.dsh-oauth-auth.json`。
 
@@ -28,15 +42,15 @@ PATH 上需要官方 `dsh`（没有的话用 `npx @deepseek-ai/dsh`）和 **pnpm
 
 需要 Node 22.19+，以及能跑起来的官方 DeepSeek Harness **0.1.7-rc.2**（`@deepseek-ai/dsh@0.1.7-rc.2`，tag `dsh-v0.1.7-rc.2`）。
 
-这条 `github:` 命令能装上，是因为包装了 `dsh.bundle.patch`，并且仓库提交了编好的 `lib/`。官方 `dsh plugin add` 在 `$DSH_HOME/profiles/web` 里跑 pnpm，再把这个包装进 `dsh.profile.bundles`。不需要 Creator Mode，也不需要另装一套工具。
+这条 `github:` 命令能装上，是因为包装了 `dsh.bundle.patch`，并且仓库提交了编好的 `lib/`。不需要 Creator Mode，也不需要另装一套工具。
 
 没有 `dsh` 时：
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add github:aa2246740/dsh-oauth-login
+npx @deepseek-ai/dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.6
 ```
 
-本机改源码时再用 `file:`（不要写成裸的 `./`）：
+本机改源码时再用 `file:`（开发/本地测试；不要写成裸的 `./`）：
 
 ```sh
 git clone https://github.com/aa2246740/dsh-oauth-login.git

@@ -2,11 +2,25 @@
 
 [中文](README.md) | English
 
-```sh
-dsh plugin --profile web add github:aa2246740/dsh-oauth-login
+## Install
+
+### DSH Studio desktop app (recommended)
+
+Open **Settings → Plugins → Add plugin** and enter this in “Package name or address”:
+
+```text
+github:aa2246740/dsh-oauth-login#v0.2.6
 ```
 
-You need official `dsh` on PATH (or `npx @deepseek-ai/dsh`) and **pnpm**. Then restart that Host and reload the page. `dsh plugin add` writes the profile. It does not hot-load a running Host.
+The desktop plugin manager owns the Desktop profile and bundled package manager. This release includes built `lib/`; normal use needs no clone, build, or DSHX installation. Follow the app if it asks you to reload or reopen after installation.
+
+### Web CLI
+
+```sh
+dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.6
+```
+
+This official CLI command writes only the `web` profile; it cannot modify the Desktop App profile. For an already-running Web Host, reopen that Host once and reload the page.
 
 OAuth login for ChatGPT, Claude, Grok, Copilot, OpenRouter, and Kimi on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), plus Zhipu GLM Coding Plan via its official plan API key. Credentials go only to `$DSH_HOME/.dsh-oauth-auth.json`.
 
@@ -28,15 +42,15 @@ The UI is **Settings → 订阅登录**.
 
 Node 22.19+ and official DeepSeek Harness **0.1.7-rc.2** (`@deepseek-ai/dsh@0.1.7-rc.2`, tag `dsh-v0.1.7-rc.2`).
 
-That `github:` command works because this package declares `dsh.bundle.patch` and commits built `lib/`. Official `dsh plugin add` runs pnpm in `$DSH_HOME/profiles/web` and appends this package to `dsh.profile.bundles`. You do not need Creator Mode or a second toolchain.
+That `github:` command works because this package declares `dsh.bundle.patch` and commits built `lib/`. You do not need Creator Mode or a second toolchain.
 
 If `dsh` is not on PATH:
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add github:aa2246740/dsh-oauth-login
+npx @deepseek-ai/dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.6
 ```
 
-Use `file:` only when you are editing a local clone (do not drop the prefix):
+Use `file:` only when you are editing a local clone (development/local testing; do not drop the prefix):
 
 ```sh
 git clone https://github.com/aa2246740/dsh-oauth-login.git

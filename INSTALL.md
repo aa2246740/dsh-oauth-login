@@ -2,21 +2,34 @@
 
 [中文](INSTALL.zh.md). Product pages: [README.md](README.md) (中文), [README.en.md](README.en.md).
 
-Stock DeepSeek Harness **0.1.7-rc.2** users install with official `dsh` and **pnpm**:
+## DSH Studio desktop app (recommended)
+
+Open **Settings → Plugins → Add plugin** and enter this in “Package name or address”:
+
+```text
+github:aa2246740/dsh-oauth-login#v0.2.6
+```
+
+The in-app plugin manager owns the Desktop profile and bundled package manager. This release includes built `lib/`; normal use needs no clone, build, or DSHX installation. Follow the app if it asks you to reload or reopen.
+
+## Web CLI
+
+Stock DeepSeek Harness **0.1.7-rc.2** users install to the Web profile with the official CLI:
 
 ```sh
-dsh plugin --profile web add github:aa2246740/dsh-oauth-login
+dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.6
 ```
 
 If `dsh` is not on PATH:
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add github:aa2246740/dsh-oauth-login
+npx @deepseek-ai/dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.6
 ```
 
 That `github:` spec works because the package declares `dsh.bundle.patch` and
 commits built `lib/`. Official add runs pnpm in `$DSH_HOME/profiles/web` and
-appends the package to `dsh.profile.bundles`. Then restart that Host and reload
+appends the package to `dsh.profile.bundles`. This command writes only `web`,
+not the Desktop App profile. Reopen an already-running Web Host once and reload
 the page. You do not need Creator Mode or a second toolchain.
 
 Use `file:` only when editing a local clone. Keep the prefix. A bare
