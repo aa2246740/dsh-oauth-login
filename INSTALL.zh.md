@@ -7,23 +7,23 @@
 打开 **设置 → 插件 → 添加插件**，在“包名或地址”中输入：
 
 ```text
-github:aa2246740/dsh-oauth-login#v0.2.6
+github:aa2246740/dsh-oauth-login#v0.2.7
 ```
 
 应用内插件管理器负责 Desktop profile 和内置包管理器。本发布已包含编译好的 `lib/`；普通使用不需要 clone、构建或安装 DSHX。若应用提示刷新或重新打开，请按提示完成。
 
 ## Web CLI
 
-官方 DeepSeek Harness **0.1.7-rc.2** 用户用官方 CLI 安装到 Web profile：
+官方 DeepSeek Harness **0.2.0-rc.1** 用户用官方 CLI 安装到 Web profile：
 
 ```sh
-dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.6
+dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.7
 ```
 
 没有 `dsh` 时：
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.6
+npx @deepseek-ai/dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.7
 ```
 
 这条 `github:` 命令能装上，是因为包装了 `dsh.bundle.patch`，并且仓库提交了编好的 `lib/`。官方 add 在 `$DSH_HOME/profiles/web` 里跑 pnpm，再把这个包装进 `dsh.profile.bundles`。这条命令只写 `web` profile，不能修改 Desktop App 的 profile；已运行的 Web Host 需要重新打开一次，再刷新网页。不需要 Creator Mode，也不需要另装一套工具。
