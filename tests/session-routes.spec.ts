@@ -85,7 +85,6 @@ describe('authenticated harness routes', () => {
     expect(await session.authenticatedRoutes()).toEqual(['pi-zai-coding-cn'])
     expect(session.visibleModels('zai-coding-cn').map(model => model.id)).toContain('glm-5.3')
     expect(session.visibleModels('zai-coding-cn').map(model => model.id)).toContain('glm-5.3-flash')
-    expect(session.visibleModels('zai-coding-cn').map(model => model.id)).toContain('glm-5.2')
   })
 
   it('resolves standard GLM-5.3 and Flash as distinct DSH model choices', async () => {

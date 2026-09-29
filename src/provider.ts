@@ -1,5 +1,6 @@
 /** Installed pi-ai providers remapped onto independent harness routes. */
 
+import { normalizeContext } from '@earendil-works/pi-ai'
 import { builtinProviders } from '@earendil-works/pi-ai/providers/all'
 import type { Api, ApiKeyAuth, Model, Provider } from '@earendil-works/pi-ai'
 import { PI_LOGIN_PROVIDERS } from './catalog.ts'
@@ -108,7 +109,7 @@ export function harnessProvider(
         ? prepareOpenRouterOptions(model, request.options, catalog) : request.options
       return base.stream(
         model,
-        request.context,
+        normalizeContext(request.context),
         // pi-ai's generic ApiStreamOptions<T> is a conditional type. The
         // preparation step preserves every provider-specific field and only
         // adds StreamOptions.onPayload, but TypeScript cannot prove that for T.
@@ -121,7 +122,7 @@ export function harnessProvider(
         ? prepareOpenRouterOptions(model, request.options, catalog) : request.options
       return base.streamSimple(
         model,
-        request.context,
+        normalizeContext(request.context),
         guarded,
       )
     },

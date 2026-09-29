@@ -40,7 +40,7 @@ The UI is **Settings → 订阅登录**.
 
 ## Install
 
-Node 22.19+ and official DeepSeek Harness **0.2.0-rc.1** (`@deepseek-ai/dsh@0.2.0-rc.1`, tag `dsh-v0.2.0-rc.1`, SHA `4878cdabd87d4041bdaff61d04c966883b9fd07a`). The `@deepseek-ai/dsh` peer is `>=0.2.0-rc.1 <0.2.1`: it accepts `0.2.0-rc.1` and stable `0.2.0`, and rejects `0.2.0` alphas and `0.1.7-rc.2`.
+Node 22.19+ and official DeepSeek Harness **0.2.0-rc.2** (`@deepseek-ai/dsh@0.2.0-rc.2`, tag `dsh-v0.2.0-rc.2`, SHA `639ed015397290b3745d163aafe02ffee4aa3f84`). The `@deepseek-ai/dsh` peer is `>=0.2.0-rc.1 <0.2.1`: it accepts `0.2.0-rc.2` and stable `0.2.0`, and rejects `0.2.0` alphas and `0.1.7-rc.2`.
 
 That `github:` command works because this package declares `dsh.bundle.patch` and commits built `lib/`. You do not need Creator Mode or a second toolchain.
 

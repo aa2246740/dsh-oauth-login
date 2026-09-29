@@ -40,7 +40,7 @@ dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.7
 
 ## 安装
 
-需要 Node 22.19+，以及能跑起来的官方 DeepSeek Harness **0.2.0-rc.1**（`@deepseek-ai/dsh@0.2.0-rc.1`，tag `dsh-v0.2.0-rc.1`，SHA `4878cdabd87d4041bdaff61d04c966883b9fd07a`）。`@deepseek-ai/dsh` peer 为 `>=0.2.0-rc.1 <0.2.1`：接受 `0.2.0-rc.1` 和稳定版 `0.2.0`，拒绝 `0.2.0` alpha，也拒绝 `0.1.7-rc.2`。
+需要 Node 22.19+，以及能跑起来的官方 DeepSeek Harness **0.2.0-rc.2**（`@deepseek-ai/dsh@0.2.0-rc.2`，tag `dsh-v0.2.0-rc.2`，SHA `639ed015397290b3745d163aafe02ffee4aa3f84`）。`@deepseek-ai/dsh` peer 为 `>=0.2.0-rc.1 <0.2.1`：接受 `0.2.0-rc.2` 和稳定版 `0.2.0`，拒绝 `0.2.0` alpha，也拒绝 `0.1.7-rc.2`。
 
 这条 `github:` 命令能装上，是因为包装了 `dsh.bundle.patch`，并且仓库提交了编好的 `lib/`。不需要 Creator Mode，也不需要另装一套工具。
 

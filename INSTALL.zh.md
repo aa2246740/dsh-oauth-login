@@ -14,7 +14,7 @@ github:aa2246740/dsh-oauth-login#v0.2.7
 
 ## Web CLI
 
-官方 DeepSeek Harness **0.2.0-rc.1** 用户用官方 CLI 安装到 Web profile：
+官方 DeepSeek Harness **0.2.0-rc.2** 用户用官方 CLI 安装到 Web profile：
 
 ```sh
 dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.7

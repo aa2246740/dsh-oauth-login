@@ -14,7 +14,7 @@ The in-app plugin manager owns the Desktop profile and bundled package manager. 
 
 ## Web CLI
 
-Stock DeepSeek Harness **0.2.0-rc.1** users install to the Web profile with the official CLI:
+Stock DeepSeek Harness **0.2.0-rc.2** users install to the Web profile with the official CLI:
 
 ```sh
 dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.7
