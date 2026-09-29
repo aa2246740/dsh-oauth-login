@@ -15,6 +15,7 @@ import {
   prepareNativeToolRequest,
   wrapOnPayload,
 } from '../src/native-tools.ts'
+import { normalizeContext } from '@earendil-works/pi-ai'
 import type { StreamOptions } from '@earendil-works/pi-ai'
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import { requirePiLoginProvider } from '../src/catalog.ts'
@@ -39,14 +40,14 @@ describe('native OAuth tools', () => {
       if (model === undefined) throw new Error('grok-4.6 missing')
 
       let captured: { payload: unknown; api: string } | undefined
-      const events = provider[method](model, {
+      const events = provider[method](model, normalizeContext({
         messages: [{ role: 'user', content: [{ type: 'text', text: 'Search X.' }], timestamp: 1 }],
         tools: [
           { name: 'bash', description: 'Run a command.', parameters: { type: 'object' } },
           { name: 'web_search', description: 'Search the web.', parameters: { type: 'object' } },
           { name: 'web_fetch', description: 'Fetch a page.', parameters: { type: 'object' } },
         ],
-      }, {
+      }), {
         apiKey: 'test-only',
         onPayload: (payload, sentModel) => {
           captured = { payload, api: sentModel.api }

@@ -3,6 +3,7 @@
  * DSH's web_search function tool would hide those and bill a second key.
  */
 
+import { getCurrentTools } from '@earendil-works/pi-ai'
 import type { Context as PiContext, StreamOptions } from '@earendil-works/pi-ai'
 import type { ReplayEnvelope, StreamChunk } from '@deepseek-ai/dsh-llm'
 import { piLoginProviderByRoute } from './catalog.ts'
@@ -391,10 +392,15 @@ export function filterPiContext(
   api: string | undefined,
   policy: NativeToolPolicy = DEFAULT_NATIVE_TOOL_POLICY,
 ): PiContext {
-  if (nativePlan(providerId, api, policy) === undefined || context.tools === undefined) return context
+  if (nativePlan(providerId, api, policy) === undefined) return context
   return {
     ...context,
-    tools: context.tools.filter(tool => !isDshWebToolName(tool.name)),
+    ...(context.tools === undefined ? {} : { tools: context.tools.filter(tool => !isDshWebToolName(tool.name)) }),
+    messages: context.messages.map(message => message.role !== 'system' ? message : {
+      ...message,
+      ...(message.toolsAdded === undefined ? {} : { toolsAdded: message.toolsAdded.filter(tool => !isDshWebToolName(tool.name)) }),
+      ...(message.toolsRemoved === undefined ? {} : { toolsRemoved: message.toolsRemoved.filter(tool => !isDshWebToolName(tool.name)) }),
+    }),
   }
 }
 
@@ -413,7 +419,7 @@ export function prepareNativeToolRequest<TOptions extends StreamOptions>(
   api: string | undefined,
   policy: NativeToolPolicy = DEFAULT_NATIVE_TOOL_POLICY,
 ): { context: PiContext; options: TOptions & StreamOptions } {
-  if (context.tools === undefined || nativePlan(providerId, api, policy) === undefined) {
+  if ((context.tools === undefined && getCurrentTools(context.messages).length === 0) || nativePlan(providerId, api, policy) === undefined) {
     return { context, options }
   }
   const onPayload = wrapOnPayload(options?.onPayload, providerId, api, policy)

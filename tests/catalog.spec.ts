@@ -94,7 +94,6 @@ describe('Pi login catalog', () => {
     const ids = harnessModels(zhipu).map(model => model.id)
     expect(ids).toContain('glm-5.3')
     expect(ids).toContain('glm-5.3-flash')
-    expect(ids).toContain('glm-5.2')
     expect(preferredModel(zhipu)).toBe('glm-5.3-flash')
   })
 

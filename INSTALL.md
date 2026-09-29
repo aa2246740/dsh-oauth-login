@@ -7,23 +7,23 @@
 Open **Settings → Plugins → Add plugin** and enter this in “Package name or address”:
 
 ```text
-github:aa2246740/dsh-oauth-login#v0.2.6
+github:aa2246740/dsh-oauth-login#v0.2.7
 ```
 
 The in-app plugin manager owns the Desktop profile and bundled package manager. This release includes built `lib/`; normal use needs no clone, build, or DSHX installation. Follow the app if it asks you to reload or reopen.
 
 ## Web CLI
 
-Stock DeepSeek Harness **0.1.7-rc.2** users install to the Web profile with the official CLI:
+Stock DeepSeek Harness **0.2.0-rc.2** users install to the Web profile with the official CLI:
 
 ```sh
-dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.6
+dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.7
 ```
 
 If `dsh` is not on PATH:
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.6
+npx @deepseek-ai/dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.7
 ```
 
 That `github:` spec works because the package declares `dsh.bundle.patch` and

@@ -1,3 +1,4 @@
+import { normalizeContext } from '@earendil-works/pi-ai'
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -324,9 +325,9 @@ describe('free-only outbound payload', () => {
     const provider = session.provider('openrouter')
     const chosen = provider.getModels()[0]
     const events = []
-    for await (const event of provider.streamSimple(chosen, {
+    for await (const event of provider.streamSimple(chosen, normalizeContext({
       messages: [{ role: 'user', content: 'Say ok', timestamp: Date.now() }],
-    }, { apiKey: 'test-only-key', maxTokens: 16, maxRetries: 0 })) events.push(event)
+    }), { apiKey: 'test-only-key', maxTokens: 16, maxRetries: 0 })) events.push(event)
     expect(events.filter(event => event.type === 'error')).toEqual([])
     expect(events.some(event => event.type === 'done')).toBe(true)
     expect(fetch).toHaveBeenCalledTimes(1)

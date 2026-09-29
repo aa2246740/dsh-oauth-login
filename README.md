@@ -9,7 +9,7 @@
 打开 **设置 → 插件 → 添加插件**，在“包名或地址”中输入：
 
 ```text
-github:aa2246740/dsh-oauth-login#v0.2.6
+github:aa2246740/dsh-oauth-login#v0.2.7
 ```
 
 桌面端插件管理器负责 Desktop profile 和内置包管理器。本发布已包含编译好的 `lib/`；普通使用不需要 clone、构建或安装 DSHX。若应用提示刷新或重新打开，请按提示完成。
@@ -17,7 +17,7 @@ github:aa2246740/dsh-oauth-login#v0.2.6
 ### Web CLI
 
 ```sh
-dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.6
+dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.7
 ```
 
 这条官方 CLI 命令只写入 `web` profile，不能修改 Desktop App 的 profile。对于已经运行的 Web Host，请重新打开该 Host 一次，再刷新网页。
@@ -40,14 +40,14 @@ dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.6
 
 ## 安装
 
-需要 Node 22.19+，以及能跑起来的官方 DeepSeek Harness **0.1.7-rc.2**（`@deepseek-ai/dsh@0.1.7-rc.2`，tag `dsh-v0.1.7-rc.2`）。
+需要 Node 22.19+，以及能跑起来的官方 DeepSeek Harness **0.2.0-rc.2**（`@deepseek-ai/dsh@0.2.0-rc.2`，tag `dsh-v0.2.0-rc.2`，SHA `639ed015397290b3745d163aafe02ffee4aa3f84`）。`@deepseek-ai/dsh` peer 为 `>=0.2.0-rc.1 <0.2.1`：接受 `0.2.0-rc.2` 和稳定版 `0.2.0`，拒绝 `0.2.0` alpha，也拒绝 `0.1.7-rc.2`。
 
 这条 `github:` 命令能装上，是因为包装了 `dsh.bundle.patch`，并且仓库提交了编好的 `lib/`。不需要 Creator Mode，也不需要另装一套工具。
 
 没有 `dsh` 时：
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.6
+npx @deepseek-ai/dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.7
 ```
 
 本机改源码时再用 `file:`（开发/本地测试；不要写成裸的 `./`）：
