@@ -2,7 +2,8 @@ name: Publish to npm
 
 # Push a tag like v1.2.3 (must match package.json version) to publish.
 # Auth is npm Trusted Publishing (OIDC) - no NPM_TOKEN needed.
-# Manual run with dry_run=true installs, builds, tests and runs `npm publish --dry-run` only.
+# Manual run with dry_run=true installs, builds, tests and packs only (nothing is published).
+# A version that is already on npm is skipped, so re-runs are safe.
 on:
   push:
     tags:
@@ -10,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Dry run (npm publish --dry-run, nothing is published)'
+        description: 'Dry run (nothing is published)'
         type: boolean
         default: false
 
@@ -60,7 +61,7 @@ jobs:
           npm ci --prefix "$H/tools/dshx" --ignore-scripts --no-audit --no-fund
           echo "DSHX_HARNESS=$H" >> "$GITHUB_ENV"
 
-      - run: pnpm install --frozen-lockfile --config.auto-install-peers=false
+      - run: pnpm install --frozen-lockfile --config.auto-install-peers=false --config.strict-dep-builds=false
       - run: pnpm run build
       - run: pnpm test
 
@@ -70,11 +71,11 @@ jobs:
           publish_dir() {
             NAME=$(node -p "require('./$1/package.json').name")
             VER=$(node -p "require('./$1/package.json').version")
-            if [ "$DRY_RUN" = "true" ]; then
-              echo "dry run: $NAME@$VER"
+            if node -e "fetch('https://registry.npmjs.org/'+process.argv[1].replace('/','%2f')).then(r=>r.json()).then(j=>process.exit(j.versions&&j.versions[process.argv[2]]?0:1),()=>process.exit(1))" "$NAME" "$VER"; then
+              echo "$NAME@$VER is already on npm - not publishing"
+              if [ "$DRY_RUN" = "true" ]; then (cd "$1" && npm pack --dry-run); fi
+            elif [ "$DRY_RUN" = "true" ]; then
               (cd "$1" && npm publish --access public --dry-run)
-            elif node -e "fetch('https://registry.npmjs.org/'+process.argv[1].replace('/','%2f')).then(r=>r.json()).then(j=>process.exit(j.versions&&j.versions[process.argv[2]]?0:1),()=>process.exit(1))" "$NAME" "$VER"; then
-              echo "$NAME@$VER is already on npm - skipping"
             else
               (cd "$1" && npm publish --access public)
             fi
