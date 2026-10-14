@@ -33,6 +33,33 @@ async function* stream(chunks: readonly StreamChunk[]): AsyncGenerator<StreamChu
 
 describe('native OAuth tools', () => {
   it.each(['stream', 'streamSimple'] as const)(
+    'serializes Codex cached search and transcript tool deltas before transport on %s', async method => {
+      const provider = harnessProvider(requirePiLoginProvider('openai-codex'))
+      const model = provider.getModels().find(candidate => candidate.id === 'gpt-6-sol')!
+      let captured: Record<string, unknown> | undefined
+      const token = `test.${Buffer.from(JSON.stringify({ 'https://api.openai.com/auth': { chatgpt_account_id: 'synthetic-test-account' } })).toString('base64url')}.test`
+      const events = provider[method](model, normalizeContext({ messages: [
+        { role: 'system', content: 'Preserve this policy.', toolsAdded: [
+          { name: 'read', description: 'Read synthetic fixture', parameters: { type: 'object' } },
+          { name: 'web_search', description: 'Legacy client search', parameters: { type: 'object' } },
+        ], timestamp: 1 },
+        { role: 'system', content: 'Preserve later instruction.', toolsRemoved: [{ name: 'web_search' }], timestamp: 2 },
+        { role: 'user', content: [{ type: 'text', text: 'Read the fixture.' }], timestamp: 3 },
+      ] }), { apiKey: token, onPayload(payload) {
+        captured = payload as Record<string, unknown>
+        throw new Error('synthetic payload captured before network')
+      } })
+      for await (const _event of events) { /* No transport: capture hook always throws. */ }
+      expect(captured).toMatchObject({ tools: [
+        { type: 'web_search', external_web_access: false },
+        expect.objectContaining({ type: 'function', name: 'read' }),
+      ] })
+      expect(JSON.stringify(captured)).toContain('Preserve this policy.')
+      expect(JSON.stringify(captured)).toContain('Preserve later instruction.')
+    },
+  )
+
+  it.each(['stream', 'streamSimple'] as const)(
     'serializes Grok 4.6 native tools through Responses on %s',
     async (method) => {
       const provider = harnessProvider(requirePiLoginProvider('xai'))
@@ -332,11 +359,32 @@ describe('native OAuth tools', () => {
     ])
   })
 
-  it('gives Codex hosted search and image generation', () => {
+  it('gives Codex explicit cached search without unsupported hosted image generation', () => {
     expect(nativePlan('openai-codex', 'openai-codex-responses')?.hosted).toEqual([
-      { type: 'web_search' },
-      { type: 'image_generation' },
+      { type: 'web_search', external_web_access: false },
     ])
+  })
+
+  it('keeps Codex live access explicit and leaves client web functions available when hosted search is off', () => {
+    expect(nativePlan('openai-codex', 'openai-codex-responses', { enabled: true, image: true, codexSearch: 'live' })?.hosted)
+      .toEqual([{ type: 'web_search', external_web_access: true }])
+    const context = { messages: [], tools: [{ name: 'web_search', description: 'Client search', parameters: {} }] }
+    const prepared = prepareNativeToolRequest(context, {}, 'openai-codex', 'openai-codex-responses',
+      { enabled: true, image: true, codexSearch: 'off' })
+    expect(prepared.context).toBe(context)
+    expect(prepared.options.onPayload).toBeUndefined()
+  })
+
+  it('revalidates the final Codex declaration after an existing payload callback', async () => {
+    const wrapped = wrapOnPayload(payload => ({ ...(payload as object), tools: [
+      { type: 'web_search', external_web_access: true, filters: { allowed_domains: ['example.com'] } },
+      { type: 'image_generation' }, { type: 'function', name: 'fusion_delegate' },
+    ] }), 'openai-codex', 'openai-codex-responses')!
+    const result = await wrapped({ tools: [] }, {} as never)
+    expect(result).toEqual({ tools: [
+      { type: 'web_search', external_web_access: false, filters: { allowed_domains: ['example.com'] } },
+      { type: 'function', name: 'fusion_delegate' },
+    ] })
   })
 
   it('gives Claude the Anthropic server search tool only', () => {
@@ -491,8 +539,7 @@ describe('native OAuth tools', () => {
       ],
     }, { id: 'gpt-5.3-codex-spark' } as never))).resolves.toEqual({
       tools: [
-        { type: 'web_search' },
-        { type: 'image_generation' },
+        { type: 'web_search', external_web_access: false },
         { type: 'function', name: 'bash', parameters: {} },
       ],
     })
@@ -503,7 +550,8 @@ describe('native OAuth tools', () => {
       tools: [{ type: 'web_search' }, { type: 'function', name: 'read' }],
     }, 'openai-codex', 'openai-codex-responses') as { tools: Record<string, unknown>[] }
     expect(next.tools.filter(tool => tool.type === 'web_search')).toHaveLength(1)
-    expect(next.tools.some(tool => tool.type === 'image_generation')).toBe(true)
+    expect(next.tools.some(tool => tool.type === 'image_generation')).toBe(false)
+    expect(next.tools.find(tool => tool.type === 'web_search')?.external_web_access).toBe(false)
   })
 
   it('leaves non-object payloads alone', () => {

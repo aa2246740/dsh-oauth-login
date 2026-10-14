@@ -9,7 +9,7 @@
 Open **Settings → Plugins → Add plugin** and enter this in “Package name or address”:
 
 ```text
-github:aa2246740/dsh-oauth-login#v0.2.7
+dsh-oauth-login@0.2.9
 ```
 
 The desktop plugin manager owns the Desktop profile and bundled package manager. This release includes built `lib/`; normal use needs no clone, build, or DSHX installation. Follow the app if it asks you to reload or reopen after installation.
@@ -17,10 +17,10 @@ The desktop plugin manager owns the Desktop profile and bundled package manager.
 ### Web CLI
 
 ```sh
-dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.7
+dsh plugin --profile web add dsh-oauth-login@0.2.9
 ```
 
-This official CLI command writes only the `web` profile; it cannot modify the Desktop App profile. For an already-running Web Host, reopen that Host once and reload the page.
+This official CLI command writes only the `web` profile; it cannot modify the Desktop App profile. Follow the installer's activation result and reopen the original launcher only when a restart is required.
 
 OAuth login for ChatGPT, Claude, Grok, Copilot, OpenRouter, and Kimi on [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), plus Zhipu GLM Coding Plan via its official plan API key. Credentials go only to `$DSH_HOME/.dsh-oauth-auth.json`.
 
@@ -47,7 +47,7 @@ That `github:` command works because this package declares `dsh.bundle.patch` an
 If `dsh` is not on PATH:
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.7
+npx @deepseek-ai/dsh plugin --profile web add dsh-oauth-login@0.2.9
 ```
 
 Use `file:` only when you are editing a local clone (development/local testing; do not drop the prefix):
@@ -97,7 +97,7 @@ On these routes the plugin removes DSH `web_search` / `web_fetch` and attaches t
 | Route | Hosted tools |
 |---|---|
 | `pi-xai` | `web_search`, `x_search`, `image_generation` |
-| `pi-openai-codex` | `web_search`, `image_generation` |
+| `pi-openai-codex` | `web_search` (cached by default) |
 | `pi-anthropic` | `web_search_20250305` |
 
 Copilot, OpenRouter, Kimi, and Zhipu do not get hosted tools. To keep DSH search:
@@ -110,6 +110,8 @@ Copilot, OpenRouter, Kimi, and Zhipu do not get hosted tools. To keep DSH search
 ```
 
 `nativeImage: false` keeps search and drops image generation.
+
+Codex uses its own tool declaration. `codexSearch: cached` sends `external_web_access: false`; `live` explicitly enables external access; `off` leaves the DSH client web tools available. Cached results may be stale. Account or backend rejections remain visible, and the plugin never silently changes model or search mode. Codex does not inherit generic Responses image-generation tools. Grok and Anthropic retain their own protocols.
 
 Chat retries use official `dsh-llm-retry`. HTTP 429 is not the same as quota exhaustion. **Settings → 订阅登录 → 网络代理** affects only this plugin.
 

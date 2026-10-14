@@ -18,8 +18,10 @@ export interface Config {
    * search, and attach those hosted tools to the provider request.
    */
   nativeTools?: boolean
-  /** Also attach hosted image generation on Grok and Codex. */
+  /** Also attach hosted image generation on transports that support it (Grok). */
   nativeImage?: boolean
+  /** Codex defaults to cached search; live external access is explicit. */
+  codexSearch?: 'cached' | 'live' | 'off'
 }
 
 export const Config: z<Config> = z.object({
@@ -27,4 +29,5 @@ export const Config: z<Config> = z.object({
   retryPolicy: RetryPolicySchema,
   nativeTools: z.boolean().default(true),
   nativeImage: z.boolean().default(true),
+  codexSearch: z.union(['cached', 'live', 'off']).default('cached'),
 })
