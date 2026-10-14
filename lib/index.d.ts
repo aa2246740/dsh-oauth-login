@@ -20,8 +20,10 @@ interface Config {
    * search, and attach those hosted tools to the provider request.
    */
   nativeTools?: boolean;
-  /** Also attach hosted image generation on Grok and Codex. */
+  /** Also attach hosted image generation on transports that support it (Grok). */
   nativeImage?: boolean;
+  /** Codex defaults to cached search; live external access is explicit. */
+  codexSearch?: 'cached' | 'live' | 'off';
 }
 declare const Config: z<Config>;
 //#endregion
@@ -117,6 +119,8 @@ interface NativeToolPolicy {
   enabled: boolean;
   /** Also attach hosted image generation where the provider documents it. Default true. */
   image: boolean;
+  /** Codex search distinguishes cached content from live external access. */
+  codexSearch?: 'cached' | 'live' | 'off';
 }
 declare const DEFAULT_NATIVE_TOOL_POLICY: NativeToolPolicy;
 interface NativeToolPlan {

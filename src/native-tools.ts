@@ -48,11 +48,14 @@ export interface NativeToolPolicy {
   enabled: boolean
   /** Also attach hosted image generation where the provider documents it. Default true. */
   image: boolean
+  /** Codex search distinguishes cached content from live external access. */
+  codexSearch?: 'cached' | 'live' | 'off'
 }
 
 export const DEFAULT_NATIVE_TOOL_POLICY: NativeToolPolicy = {
   enabled: true,
   image: true,
+  codexSearch: 'cached',
 }
 
 export interface NativeToolPlan {
@@ -67,6 +70,9 @@ const SEARCH_GUIDANCE =
 
 const SEARCH_AND_IMAGE_GUIDANCE =
   'This turn already includes this account\'s native hosted search and image generation. Do not call web_search or web_fetch — those DSH tools are not available on this route.'
+
+const CACHED_SEARCH_GUIDANCE =
+  'This turn includes native cached web search. Cached results may not reflect current pages. Do not call web_search or web_fetch as client functions — those DSH tools are not available on this route.'
 
 function responsesSearch(): Record<string, unknown> {
   return { type: 'web_search' }
@@ -103,14 +109,15 @@ export function nativePlan(
         guidance: policy.image ? SEARCH_AND_IMAGE_GUIDANCE : SEARCH_GUIDANCE,
       }
     case 'openai-codex:openai-codex-responses':
+      if (policy.codexSearch === 'off') return undefined
       return {
         providerId,
         api: 'openai-codex-responses',
-        hosted: [
-          responsesSearch(),
-          ...policy.image ? [responsesImage()] : [],
-        ],
-        guidance: policy.image ? SEARCH_AND_IMAGE_GUIDANCE : SEARCH_GUIDANCE,
+        // Codex is a distinct transport. Its official tool specification makes
+        // external access explicit; the generic Responses default is not a
+        // substitute. Hosted image generation is not part of this contract.
+        hosted: [{ type: 'web_search', external_web_access: policy.codexSearch === 'live' }],
+        guidance: policy.codexSearch === 'live' ? SEARCH_GUIDANCE : CACHED_SEARCH_GUIDANCE,
       }
     case 'anthropic:anthropic-messages':
       return {
@@ -352,15 +359,14 @@ export function applyNativeToolsToPayload(
   const plan = nativePlan(providerId, api, policy)
   if (plan === undefined || !isRecord(payload) || !Array.isArray(payload.tools)) return payload
   const current = payload.tools
-  const kept = current.filter(tool => !isDshWebFunctionTool(tool))
-  const seen = new Set(
-    kept.filter(isRecord).map(tool => hostedToolKey(tool)),
-  )
-  const hosted = plan.hosted.filter(tool => {
-    const key = hostedToolKey(tool)
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
+  const managed = new Set(plan.hosted.map(hostedToolKey))
+  const kept = current.filter(tool => !isDshWebFunctionTool(tool)
+    && (!isRecord(tool) || !managed.has(hostedToolKey(tool)))
+    && !(providerId === 'openai-codex' && isRecord(tool) && tool.type === 'image_generation'))
+  const hosted = plan.hosted.map(tool => {
+    const previous = current.find(candidate => isRecord(candidate) && hostedToolKey(candidate) === hostedToolKey(tool))
+    // Preserve caller filters, but explicit transport capability fields win.
+    return { ...(isRecord(previous) ? previous : {}), ...tool }
   })
   return { ...payload, tools: [...hosted, ...kept] }
 }
@@ -381,8 +387,10 @@ export function wrapOnPayload(
       ? { ...payload, tools: [] }
       : payload
     const injected = applyNativeToolsToPayload(requestPayload, providerId, api, policy)
-    if (existing === undefined) return injected
-    return await existing(injected, model)
+    // Preserve the existing callback's observation contract, then revalidate
+    // the actual returned payload so it cannot restore an unsupported tool.
+    const customized = existing === undefined ? undefined : await existing(injected, model)
+    return applyNativeToolsToPayload(customized === undefined ? injected : customized, providerId, api, policy)
   }
 }
 

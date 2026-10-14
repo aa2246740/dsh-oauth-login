@@ -3,3 +3,11 @@ entry: src/index.ts
 marker: "[my-plugins/dsh-oauth-login] loaded"
 kind: function
 profile: web
+hotReload:
+  artifacts:
+    - lib/index.js
+    - src/index.ts
+    - src/adapter.ts
+    - src/provider.ts
+    - src/native-tools.ts
+    - src/plugin-config.ts

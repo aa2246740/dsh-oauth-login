@@ -9,7 +9,7 @@
 打开 **设置 → 插件 → 添加插件**，在“包名或地址”中输入：
 
 ```text
-github:aa2246740/dsh-oauth-login#v0.2.7
+dsh-oauth-login@0.2.9
 ```
 
 桌面端插件管理器负责 Desktop profile 和内置包管理器。本发布已包含编译好的 `lib/`；普通使用不需要 clone、构建或安装 DSHX。若应用提示刷新或重新打开，请按提示完成。
@@ -17,10 +17,10 @@ github:aa2246740/dsh-oauth-login#v0.2.7
 ### Web CLI
 
 ```sh
-dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.7
+dsh plugin --profile web add dsh-oauth-login@0.2.9
 ```
 
-这条官方 CLI 命令只写入 `web` profile，不能修改 Desktop App 的 profile。对于已经运行的 Web Host，请重新打开该 Host 一次，再刷新网页。
+这条官方 CLI 命令只写入 `web` profile，不能修改 Desktop App 的 profile。按安装器的生效结果继续；只有提示需要重启时才用原启动方式重新打开 Host。
 
 把 ChatGPT、Claude、Grok、Copilot、OpenRouter、Kimi 的 OAuth 登录和智谱 GLM Coding Plan 接到 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)。凭据只写 `$DSH_HOME/.dsh-oauth-auth.json`。
 
@@ -47,7 +47,7 @@ dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.7
 没有 `dsh` 时：
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add github:aa2246740/dsh-oauth-login#v0.2.7
+npx @deepseek-ai/dsh plugin --profile web add dsh-oauth-login@0.2.9
 ```
 
 本机改源码时再用 `file:`（开发/本地测试；不要写成裸的 `./`）：
@@ -109,7 +109,9 @@ Copilot、OpenRouter、Kimi、智谱不挂 hosted tool。要继续用 DSH 自己
     nativeTools: false
 ```
 
-`nativeImage: false` 只留搜索，去掉出图。
+`nativeImage: false` 关闭受支持路由的托管出图。
+
+Codex 订阅路由使用独立的工具声明：`codexSearch: cached` 默认发送 `external_web_access: false`；`live` 显式请求实时外部访问，`off` 不注入托管搜索并保留 DSH 的客户端搜索工具。缓存搜索不保证结果实时性；账户和后端仍可能拒绝工具请求，插件不会自动换模型或在失败后静默重试另一种搜索模式。Codex 不再继承通用 Responses 的托管图片生成声明。Grok、Anthropic 保持各自协议。
 
 Chat 失败重试走官方 `dsh-llm-retry`。429 不等于额度耗尽。设置 → 订阅登录 → 网络代理只影响本插件。
 

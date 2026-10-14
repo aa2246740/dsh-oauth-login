@@ -131,6 +131,7 @@ export function apply(ctx: Context, config: Config): void {
   console.log('[my-plugins/dsh-oauth-login] loaded')
   const native = {
     enabled: config.nativeTools !== false,
+    codexSearch: config.codexSearch ?? 'cached',
     image: config.nativeImage !== false,
   }
   const session = new PiLoginSession(new PiLoginCredentialStore(), native)
