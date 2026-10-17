@@ -20,6 +20,14 @@ describe('authenticated harness routes', () => {
   it('resolves Astra through the DSH adapter with its supported reasoning default', async () => {
     const session = await tempSession()
     session.ensureTransport = async () => ({ source: 'direct' })
+    // 0.2.1+ PiAiAdapter.listModels returns [] while MISSING_CREDENTIAL.
+    // Keep expires in the future so getAuth does not attempt a live refresh.
+    await session.store.modify('openai-codex', async () => ({
+      type: 'oauth',
+      access: 'codex-access',
+      refresh: 'codex-refresh',
+      expires: Date.now() + 86_400_000,
+    }))
     const adapter = createPiLoginAdapter(session, () => undefined)
     expect((await adapter.listModels('pi-openai-codex')).some(model => model.id === 'gpt-6-astra')).toBe(true)
     expect(await adapter.resolveModel('pi-openai-codex', 'gpt-6-astra')).toMatchObject({

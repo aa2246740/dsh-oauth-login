@@ -33,7 +33,6 @@ export default defineConfig([
   {
     entry: {
       index: 'src/index.ts',
-      invariant: 'src/invariant.ts',
     },
     platform: 'node',
     format: 'esm',

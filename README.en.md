@@ -9,7 +9,7 @@
 Open **Settings → Plugins → Add plugin** and enter this in “Package name or address”:
 
 ```text
-dsh-oauth-login@0.2.9
+dsh-oauth-login@0.2.10
 ```
 
 The desktop plugin manager owns the Desktop profile and bundled package manager. This release includes built `lib/`; normal use needs no clone, build, or DSHX installation. Follow the app if it asks you to reload or reopen after installation.
@@ -17,7 +17,7 @@ The desktop plugin manager owns the Desktop profile and bundled package manager.
 ### Web CLI
 
 ```sh
-dsh plugin --profile web add dsh-oauth-login@0.2.9
+dsh plugin --profile web add dsh-oauth-login@0.2.10
 ```
 
 This official CLI command writes only the `web` profile; it cannot modify the Desktop App profile. Follow the installer's activation result and reopen the original launcher only when a restart is required.
@@ -40,14 +40,14 @@ The UI is **Settings → 订阅登录**.
 
 ## Install
 
-Node 22.19+ and official DeepSeek Harness **0.2.0-rc.2** (`@deepseek-ai/dsh@0.2.0-rc.2`, tag `dsh-v0.2.0-rc.2`, SHA `639ed015397290b3745d163aafe02ffee4aa3f84`). The `@deepseek-ai/dsh` peer is `>=0.2.0-rc.1 <0.2.1`: it accepts `0.2.0-rc.2` and stable `0.2.0`, and rejects `0.2.0` alphas and `0.1.7-rc.2`.
+Node 22.19+ and official DeepSeek Harness **0.2.1-rc.2** (`@deepseek-ai/dsh@0.2.1-rc.2`, tag `dsh-v0.2.1-rc.2`, SHA `687f282e8625c6b8d11ff58211a90524be2e4317`). The `@deepseek-ai/dsh` peer and `engines.dsh` are both `>=0.2.1-rc.1 <0.2.2`: they accept `0.2.1-rc.1` / `0.2.1-rc.2` and stable `0.2.1`, and reject `0.2.1` alphas and `0.2.0-rc.2`.
 
 That `github:` command works because this package declares `dsh.bundle.patch` and commits built `lib/`. You do not need Creator Mode or a second toolchain.
 
 If `dsh` is not on PATH:
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add dsh-oauth-login@0.2.9
+npx @deepseek-ai/dsh plugin --profile web add dsh-oauth-login@0.2.10
 ```
 
 Use `file:` only when you are editing a local clone (development/local testing; do not drop the prefix):

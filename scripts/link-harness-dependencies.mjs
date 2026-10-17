@@ -23,7 +23,6 @@ const shared = {
   '@deepseek-ai/dsh-client-ui-slots': 'packages/client/ui-slots',
   '@deepseek-ai/dsh-home-paths': 'packages/util/home-paths',
   '@deepseek-ai/dsh-host-webserver': 'packages/host/webserver',
-  '@deepseek-ai/dsh-invariants': 'packages/runtime-diagnostics/invariants',
   '@deepseek-ai/dsh-llm': 'packages/llm/llm',
   '@deepseek-ai/dsh-llm-pi-ai': 'packages/llm/llm-pi-ai',
   '@deepseek-ai/dsh-timeout': 'packages/util/timeout',
