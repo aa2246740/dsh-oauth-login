@@ -9,7 +9,7 @@
 打开 **设置 → 插件 → 添加插件**，在“包名或地址”中输入：
 
 ```text
-dsh-oauth-login@0.2.9
+dsh-oauth-login@0.2.10
 ```
 
 桌面端插件管理器负责 Desktop profile 和内置包管理器。本发布已包含编译好的 `lib/`；普通使用不需要 clone、构建或安装 DSHX。若应用提示刷新或重新打开，请按提示完成。
@@ -17,7 +17,7 @@ dsh-oauth-login@0.2.9
 ### Web CLI
 
 ```sh
-dsh plugin --profile web add dsh-oauth-login@0.2.9
+dsh plugin --profile web add dsh-oauth-login@0.2.10
 ```
 
 这条官方 CLI 命令只写入 `web` profile，不能修改 Desktop App 的 profile。按安装器的生效结果继续；只有提示需要重启时才用原启动方式重新打开 Host。
@@ -47,7 +47,7 @@ dsh plugin --profile web add dsh-oauth-login@0.2.9
 没有 `dsh` 时：
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add dsh-oauth-login@0.2.9
+npx @deepseek-ai/dsh plugin --profile web add dsh-oauth-login@0.2.10
 ```
 
 本机改源码时再用 `file:`（开发/本地测试；不要写成裸的 `./`）：

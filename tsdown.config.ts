@@ -26,8 +26,9 @@ function resolveHarnessAdapter(): string {
 
 const adapter = existsSync(vendored) ? vendored : resolveHarnessAdapter()
 if (!existsSync(adapter)) throw new Error('DSHX externalClientBundle adapter is missing.')
-const { externalClientBundle } = await import(pathToFileURL(adapter).href)
+const { externalClientBundle, clientBuildValueDefines } = await import(pathToFileURL(adapter).href)
 const client = externalClientBundle('dsh-oauth-login', [], { clientEntry: 'src/client/index.tsx' })[1]
+const hostDefines = clientBuildValueDefines(process.env)
 
 export default defineConfig([
   {
@@ -40,6 +41,7 @@ export default defineConfig([
     dts: true,
     outDir: 'lib',
     fixedExtension: false,
+    define: hostDefines,
     deps: { neverBundle: nodeExternal },
   },
   {
@@ -51,6 +53,7 @@ export default defineConfig([
     dts: true,
     outDir: 'lib',
     fixedExtension: false,
+    define: hostDefines,
     deps: { neverBundle: nodeExternal },
   },
   client,

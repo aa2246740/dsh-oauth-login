@@ -50,10 +50,17 @@ describe('native OAuth tools', () => {
         throw new Error('synthetic payload captured before network')
       } })
       for await (const _event of events) { /* No transport: capture hook always throws. */ }
-      expect(captured).toMatchObject({ tools: [
+      expect(captured?.tools).toEqual([
         { type: 'web_search', external_web_access: false },
-        expect.objectContaining({ type: 'function', name: 'read' }),
-      ] })
+      ])
+      // pi-ai 1.1+ Codex declares client functions in additional_tools, not the top-level list.
+      expect(captured?.input).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          type: 'additional_tools',
+          tools: [expect.objectContaining({ type: 'function', name: 'read' })],
+        }),
+      ]))
+      expect(JSON.stringify(captured)).not.toContain('Legacy client search')
       expect(JSON.stringify(captured)).toContain('Preserve this policy.')
       expect(JSON.stringify(captured)).toContain('Preserve later instruction.')
     },

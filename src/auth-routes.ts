@@ -5,6 +5,7 @@ import type { AuthEvent, AuthPrompt } from '@earendil-works/pi-ai'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import type {} from '@deepseek-ai/dsh-host-webserver'
+
 import { loginPiProviderSession, piLoginStatus } from './auth.ts'
 import { PI_LOGIN_PROVIDERS, requirePiLoginProvider } from './catalog.ts'
 import type { PiLoginProvider } from './catalog.ts'

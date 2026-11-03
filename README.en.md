@@ -9,7 +9,7 @@
 Open **Settings → Plugins → Add plugin** and enter this in “Package name or address”:
 
 ```text
-dsh-oauth-login@0.2.9
+dsh-oauth-login@0.2.10
 ```
 
 The desktop plugin manager owns the Desktop profile and bundled package manager. This release includes built `lib/`; normal use needs no clone, build, or DSHX installation. Follow the app if it asks you to reload or reopen after installation.
@@ -17,7 +17,7 @@ The desktop plugin manager owns the Desktop profile and bundled package manager.
 ### Web CLI
 
 ```sh
-dsh plugin --profile web add dsh-oauth-login@0.2.9
+dsh plugin --profile web add dsh-oauth-login@0.2.10
 ```
 
 This official CLI command writes only the `web` profile; it cannot modify the Desktop App profile. Follow the installer's activation result and reopen the original launcher only when a restart is required.
@@ -47,7 +47,7 @@ That `github:` command works because this package declares `dsh.bundle.patch` an
 If `dsh` is not on PATH:
 
 ```sh
-npx @deepseek-ai/dsh plugin --profile web add dsh-oauth-login@0.2.9
+npx @deepseek-ai/dsh plugin --profile web add dsh-oauth-login@0.2.10
 ```
 
 Use `file:` only when you are editing a local clone (development/local testing; do not drop the prefix):

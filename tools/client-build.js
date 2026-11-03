@@ -3,19 +3,26 @@
 // the emitted bundle recipe so plugins can run `npm run build` against a public clone.
 import { readFile } from 'node:fs/promises'
 import { readFileSync } from 'node:fs'
-import { basename, dirname, isAbsolute, join } from 'node:path'
+import { basename, dirname, extname, isAbsolute, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createRequire } from 'node:module'
 
 const PLATFORM_MODULES = [
   'react', 'react/jsx-runtime', 'react-dom', 'react-dom/client', '@deepseek-ai/cordis',
+  'zod', '@tanstack/react-virtual',
   '@deepseek-ai/dsh-client-store', '@deepseek-ai/dsh-client-ui-slots',
   '@deepseek-ai/dsh-client-ui-primitives', '@deepseek-ai/dsh-client-ui-dockkit',
 ]
 
+const IMAGE_MEDIA_TYPES = new Map([
+  ['.svg', 'image/svg+xml'],
+  ['.png', 'image/png'],
+  ['.webp', 'image/webp'],
+])
+
 const CSS_VIRTUAL_PREFIX = '\0dshx-css-module:'
-// Official packages/client/tsdown.client.ts INLINE_SAFE at dsh-v0.2.0-rc.2.
-// Unchanged from dsh-v0.1.7-rc.2, including dsh-api-workspace-controller/default-workspace.
+// Official packages/client/tsdown.client.ts INLINE_SAFE at dsh-v0.2.1-rc.5.
+// Unchanged from dsh-v0.2.0-rc.2, including dsh-api-workspace-controller/default-workspace.
 const INLINE_SAFE = /^(?:@deepseek-ai\/dsh-(?:file-reference|session|llm|tools|brand|deque|output-retention|typert-protocol|util-crypto|util-values|util-workspace-path)(?:\/|$)|@deepseek-ai\/dsh-token-meter\/client$|@deepseek-ai\/dsh-native-command\/types$|@deepseek-ai\/dsh-host-open-in-app\/shared$|@deepseek-ai\/dsh-plugin-manager\/registry$|@deepseek-ai\/dsh-agent-preset-registry\/display$|@deepseek-ai\/dsh-api-workspace-controller\/default-workspace$|@deepseek-ai\/dsh-spill-policy\/notice$)/
 const VENDORED_LIBRARY = /^@deepseek-ai\/(cosmokit|schemastery)(\/|$)/
 const GENERATED_REMOTE = /^@deepseek-ai\/dsh-[a-z0-9]+(?:-[a-z0-9]+)*\/remote$/
@@ -43,6 +50,15 @@ function styleInjectionModule(id, fileId, css, classMap) {
   ]
   source.push(classMap === undefined ? 'export {};' : `export default ${JSON.stringify(classMap)};`)
   return source.join('\n')
+}
+
+export function clientBuildValueDefines(environment) {
+  const values = {}
+  for (const [name, value] of Object.entries(environment)) {
+    if (!name.startsWith('DSH_CLIENT_') || value === undefined) continue
+    values[`process.env.${name}`] = JSON.stringify(value)
+  }
+  return values
 }
 
 function pluginExternals() {
@@ -83,6 +99,7 @@ function clientConfig(id, entry) {
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? 'production'),
       'import.meta.env.MODE': JSON.stringify(process.env.NODE_ENV ?? 'production'),
       'import.meta.env': JSON.stringify({ MODE: process.env.NODE_ENV ?? 'production' }),
+      ...clientBuildValueDefines(process.env),
     },
     plugins: [{
       name: 'dshx-client-bundle-purity',
@@ -116,6 +133,20 @@ function clientConfig(id, entry) {
         for (const [local, exp] of exportEntries) classMap[local] = exp.name
         return styleInjectionModule(id, fileId, code.toString(), classMap)
       },
+    }, {
+      name: 'dshx-image-inline',
+      resolveId(source, importer) {
+        if (importer === undefined || !IMAGE_MEDIA_TYPES.has(extname(source))) return null
+        const abs = !isAbsolute(source) ? join(dirname(importer), source) : source
+        return abs
+      },
+      async load(fileId) {
+        const mediaType = IMAGE_MEDIA_TYPES.get(extname(fileId))
+        if (mediaType === undefined) return null
+        this.addWatchFile?.(fileId)
+        const data = await readFile(fileId)
+        return `export default ${JSON.stringify(`data:${mediaType};base64,${data.toString('base64')}`)};`
+      },
     }],
     outputOptions: {
       entryFileNames: 'client.js',
@@ -139,6 +170,7 @@ export function externalClientBundle(id, entries, { clientEntry } = {}) {
     sourcemap: false,
     clean: false,
     dts: false,
+    define: clientBuildValueDefines(process.env),
     deps: {
       neverBundle: (specifier) => !/^[./]/.test(specifier),
       alwaysBundle: (specifier) => /^[./]/.test(specifier),
